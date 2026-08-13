@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  /* Paleta cálida: evoca el producto y lo rural/fresco */
+  --color-crema: #fff8ee;
+  --color-yema: #f5b301;
+  --color-yema-suave: #ffd95c;
+  --color-cascara: #f0e2cc;
+  --color-marron: #4a3524;
+  --color-marron-suave: #8a6f57;
+  --color-accion: #1b5e20; /* verde oscuro: botones Vender / Cobrar */
+  --color-accion-claro: #2e7d32;
+  --color-peligro: #b71c1c;
+}
+
+body {
+  background-color: var(--color-crema);
+  color: var(--color-marron);
+}
+
+/* Accesibilidad en terreno: tipografía grande y alto contraste */
+.btn-pos {
+  @apply rounded-2xl font-bold shadow-md active:scale-95 transition-transform select-none;
+}
