@@ -50,3 +50,22 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Impresión de facturas: solo se imprime el documento marcado */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .imprimible,
+  .imprimible * {
+    visibility: visible;
+  }
+  .imprimible {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+  }
+  body {
+    background: white;
+  }
+}

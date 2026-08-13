@@ -6,7 +6,15 @@ import { getSupabaseBrowser, supabaseConfigurado } from "@/lib/supabase/client";
 import RequireRole from "@/components/RequireRole";
 import AppShell from "@/components/AppShell";
 import DesgloseBar from "@/components/DesgloseBar";
-import { IcoAlmacen, IcoCamion } from "@/components/Icons";
+import {
+  IcoAlmacen,
+  IcoCamion,
+  IcoCarrito,
+  IcoGrafica,
+  IcoLista,
+} from "@/components/Icons";
+
+type Pestana = "resumen" | "pedidos" | "inventario" | "ventas";
 
 type Almacen = { nombre: string; tipo: string; huevos: number };
 type VentaReciente = { hora: string; vendedor: string; huevos: number; monto: number };
@@ -47,16 +55,19 @@ const CLASE_ESTADO: Record<string, string> = {
 const DEMO_ALMACENES: Almacen[] = [
   { nombre: "Almacén Central", tipo: "almacén", huevos: 51840 },
   { nombre: "Camión — Vendedor 1", tipo: "vehículo", huevos: 4320 },
-  { nombre: "Camión — Vendedor 2", tipo: "vehículo", huevos: 2190 },
 ];
 
 const DEMO_VENTAS: VentaReciente[] = [
   { hora: "10:42", vendedor: "Vendedor 1", huevos: 750, monto: 157.5 },
-  { hora: "10:31", vendedor: "Vendedor 2", huevos: 360, monto: 75.6 },
   { hora: "10:05", vendedor: "Vendedor 1", huevos: 30, monto: 7.5 },
 ];
 
+function fechaCorta(iso: string): string {
+  return new Date(iso).toLocaleDateString("es", { day: "2-digit", month: "short" });
+}
+
 function AdminDashboard() {
+  const [pestana, setPestana] = useState<Pestana>("resumen");
   const [almacenes, setAlmacenes] = useState<Almacen[]>(DEMO_ALMACENES);
   const [ventas, setVentas] = useState<VentaReciente[]>(DEMO_VENTAS);
   const [pedidos, setPedidos] = useState<PedidoAdmin[]>([]);
@@ -150,12 +161,23 @@ function AdminDashboard() {
 
   const totalHuevos = almacenes.reduce((a, x) => a + x.huevos, 0);
   const ventasHoy = ventas.reduce((a, v) => a + v.monto, 0);
+  const pendientes = pedidos.filter((p) =>
+    ["PENDIENTE", "CONFIRMADO", "EN_DESPACHO"].includes(p.estado),
+  ).length;
+  const porCobrar = facturas.filter((f) => !f.pagada).length;
+
+  const pestanas: { clave: Pestana; nombre: string; Icono: (p: { className?: string }) => React.ReactNode; badge?: number }[] = [
+    { clave: "resumen", nombre: "Resumen", Icono: IcoGrafica },
+    { clave: "pedidos", nombre: "Pedidos", Icono: IcoLista, badge: pendientes + porCobrar },
+    { clave: "inventario", nombre: "Inventario", Icono: IcoAlmacen },
+    { clave: "ventas", nombre: "Ventas", Icono: IcoCarrito },
+  ];
 
   return (
     <AppShell seccion="Panel de operaciones">
-      <main className="mx-auto max-w-6xl px-5 py-8">
+      <main className="mx-auto max-w-6xl px-4 py-6 pb-28 sm:px-5">
         <div className="flex items-center justify-between">
-          <h1 className="font-display text-2xl font-bold">Operación en curso</h1>
+          <h1 className="font-display text-2xl font-bold capitalize">{pestana}</h1>
           <span
             className={`flex items-center gap-2 rounded-md border px-3 py-1 text-xs font-bold uppercase tracking-wide ${
               enVivo
@@ -170,238 +192,217 @@ function AdminDashboard() {
           </span>
         </div>
 
-        {/* Indicadores principales */}
-        <section className="mt-6 grid gap-px overflow-hidden rounded-lg border border-borde bg-borde sm:grid-cols-3">
-          <div className="bg-superficie p-5">
-            <p className="eyebrow">Inventario total</p>
-            <p className="mt-2 font-display text-4xl font-extrabold tabular-nums">
-              {totalHuevos.toLocaleString("es")}
-            </p>
-            <div className="mt-3">
-              <DesgloseBar huevos={totalHuevos} />
-            </div>
-          </div>
-          <div className="bg-superficie p-5">
-            <p className="eyebrow">Ventas registradas</p>
-            <p className="mt-2 font-display text-4xl font-extrabold tabular-nums text-verde">
-              ${ventasHoy.toFixed(2)}
-            </p>
-            <p className="mt-3 text-xs text-tinta-suave">
-              {ventas.length} transacciones recientes
-            </p>
-          </div>
-          <div className="bg-superficie p-5">
-            <p className="eyebrow">Puntos de inventario</p>
-            <p className="mt-2 font-display text-4xl font-extrabold tabular-nums">
-              {almacenes.length}
-            </p>
-            <p className="mt-3 text-xs text-tinta-suave">
-              almacenes y vehículos con stock asignado
-            </p>
-          </div>
-        </section>
+        {/* ---------- RESUMEN ---------- */}
+        {pestana === "resumen" && (
+          <>
+            <section className="mt-5 grid gap-px overflow-hidden rounded-lg border border-borde bg-borde sm:grid-cols-3">
+              <div className="bg-superficie p-5">
+                <p className="eyebrow">Inventario total</p>
+                <p className="mt-2 font-display text-4xl font-extrabold tabular-nums">
+                  {totalHuevos.toLocaleString("es")}
+                </p>
+                <div className="mt-3">
+                  <DesgloseBar huevos={totalHuevos} />
+                </div>
+              </div>
+              <div className="bg-superficie p-5">
+                <p className="eyebrow">Ventas registradas</p>
+                <p className="mt-2 font-display text-4xl font-extrabold tabular-nums text-verde">
+                  ${ventasHoy.toFixed(2)}
+                </p>
+                <p className="mt-3 text-xs text-tinta-suave">
+                  {ventas.length} transacciones recientes
+                </p>
+              </div>
+              <div className="bg-superficie p-5">
+                <p className="eyebrow">Pedidos activos</p>
+                <p className="mt-2 font-display text-4xl font-extrabold tabular-nums">
+                  {pendientes}
+                </p>
+                <p className="mt-3 text-xs text-tinta-suave">
+                  {porCobrar} factura{porCobrar === 1 ? "" : "s"} por cobrar
+                </p>
+              </div>
+            </section>
 
-        {/* Pedidos de clientes: llegan en vivo y se avanzan de estado aquí */}
-        <section className="mt-8">
-          <p className="eyebrow">Pedidos de clientes</p>
-          {pedidos.length === 0 ? (
-            <p className="mt-3 rounded-lg border border-borde bg-superficie p-5 text-sm text-tinta-suave">
-              Sin pedidos por ahora. Aparecerán aquí en tiempo real cuando un
-              cliente ordene desde su portal.
-            </p>
-          ) : (
-            <div className="mt-3 overflow-x-auto rounded-lg border border-borde bg-superficie">
-              <table className="w-full min-w-[640px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-borde text-[11px] uppercase tracking-wider text-tinta-suave">
-                    <th className="px-4 py-3 font-bold">Fecha</th>
-                    <th className="px-4 py-3 font-bold">Cliente</th>
-                    <th className="px-4 py-3 font-bold">Pedido</th>
-                    <th className="px-4 py-3 text-right font-bold">Monto</th>
-                    <th className="px-4 py-3 font-bold">Estado</th>
-                    <th className="px-4 py-3 text-right font-bold">Acción</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pedidos.map((p) => {
-                    const paso = SIGUIENTE_ESTADO[p.estado];
-                    return (
-                      <tr key={p.id} className="border-b border-borde last:border-0">
-                        <td className="px-4 py-3 tabular-nums text-tinta-suave">
-                          {new Date(p.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })}
-                        </td>
-                        <td className="px-4 py-3 font-semibold">
+            {pendientes > 0 && (
+              <button
+                onClick={() => setPestana("pedidos")}
+                className="btn-tactil mt-4 w-full border border-ambar/50 bg-panal px-4 py-3.5 text-left hover:border-ambar"
+              >
+                <span className="font-semibold">
+                  {pendientes} pedido{pendientes === 1 ? "" : "s"} esperando gestión
+                </span>
+                <span className="ml-2 text-sm text-tinta-suave">→ ir a Pedidos</span>
+              </button>
+            )}
+          </>
+        )}
+
+        {/* ---------- PEDIDOS Y FACTURAS ---------- */}
+        {pestana === "pedidos" && (
+          <>
+            {pedidos.length === 0 ? (
+              <p className="mt-5 rounded-lg border border-borde bg-superficie p-6 text-center text-sm text-tinta-suave">
+                Sin pedidos por ahora. Aparecerán aquí en tiempo real cuando un
+                cliente ordene desde su portal.
+              </p>
+            ) : (
+              <section className="mt-5 space-y-3">
+                {pedidos.map((p) => {
+                  const paso = SIGUIENTE_ESTADO[p.estado];
+                  return (
+                    <div key={p.id} className="rounded-lg border border-borde bg-superficie p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-semibold">
                           {p.cliente?.full_name ?? "Cliente"}
-                        </td>
-                        <td className="px-4 py-3 text-tinta-suave">
-                          {formatoDesglose(p.total_huevos)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-semibold tabular-nums">
-                          ${Number(p.total_monto).toFixed(2)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`rounded px-2 py-0.5 text-xs font-bold uppercase ${CLASE_ESTADO[p.estado] ?? ""}`}>
-                            {p.estado.replaceAll("_", " ").toLowerCase()}
+                          <span className="ml-2 text-xs font-normal tabular-nums text-tinta-suave">
+                            {fechaCorta(p.created_at)}
                           </span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-2">
-                            {paso && (
-                              <button
-                                onClick={() => avanzarPedido(p, paso.estado)}
-                                disabled={gestionando === p.id}
-                                className="btn-tactil bg-verde px-3 py-1.5 text-xs text-white hover:bg-verde-oscuro disabled:opacity-50"
-                              >
-                                {paso.accion}
-                              </button>
-                            )}
-                            {(p.estado === "PENDIENTE" || p.estado === "CONFIRMADO") && (
-                              <button
-                                onClick={() => avanzarPedido(p, "CANCELADO")}
-                                disabled={gestionando === p.id}
-                                className="btn-tactil border border-rojo/40 px-3 py-1.5 text-xs text-rojo hover:border-rojo disabled:opacity-50"
-                              >
-                                Cancelar
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
+                        </p>
+                        <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-bold uppercase ${CLASE_ESTADO[p.estado] ?? ""}`}>
+                          {p.estado.replaceAll("_", " ").toLowerCase()}
+                        </span>
+                      </div>
+                      <p className="mt-1.5 text-sm text-tinta-suave">
+                        {formatoDesglose(p.total_huevos)}
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-display text-xl font-extrabold tabular-nums text-verde">
+                          ${Number(p.total_monto).toFixed(2)}
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {(p.estado === "PENDIENTE" || p.estado === "CONFIRMADO") && (
+                            <button
+                              onClick={() => avanzarPedido(p, "CANCELADO")}
+                              disabled={gestionando === p.id}
+                              className="btn-tactil border border-rojo/40 px-4 py-2 text-sm text-rojo hover:border-rojo disabled:opacity-50"
+                            >
+                              Cancelar
+                            </button>
+                          )}
+                          {paso && (
+                            <button
+                              onClick={() => avanzarPedido(p, paso.estado)}
+                              disabled={gestionando === p.id}
+                              className="btn-tactil bg-verde px-4 py-2 text-sm text-white hover:bg-verde-oscuro disabled:opacity-50"
+                            >
+                              {gestionando === p.id ? "…" : paso.accion}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
+            )}
 
-        {/* Facturas: se emiten al entregar; aquí se marcan pagadas */}
-        {facturas.length > 0 && (
-          <section className="mt-8">
-            <p className="eyebrow">Facturas</p>
-            <div className="mt-3 overflow-x-auto rounded-lg border border-borde bg-superficie">
-              <table className="w-full min-w-[520px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-borde text-[11px] uppercase tracking-wider text-tinta-suave">
-                    <th className="px-4 py-3 font-bold">Nº</th>
-                    <th className="px-4 py-3 font-bold">Cliente</th>
-                    <th className="px-4 py-3 font-bold">Fecha</th>
-                    <th className="px-4 py-3 text-right font-bold">Monto</th>
-                    <th className="px-4 py-3 text-right font-bold">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
+            {facturas.length > 0 && (
+              <>
+                <p className="eyebrow mt-8">Facturas</p>
+                <section className="mt-3 space-y-3">
                   {facturas.map((f) => (
-                    <tr key={f.id} className="border-b border-borde last:border-0">
-                      <td className="px-4 py-3 font-display font-bold tabular-nums">
-                        F-{String(f.numero).padStart(6, "0")}
-                      </td>
-                      <td className="px-4 py-3 font-semibold">
-                        {f.pedido?.cliente?.full_name ?? "Cliente"}
-                      </td>
-                      <td className="px-4 py-3 tabular-nums text-tinta-suave">
-                        {new Date(f.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })}
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold tabular-nums">
-                        ${Number(f.monto).toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
+                    <div
+                      key={f.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-borde bg-superficie p-4"
+                    >
+                      <div>
+                        <p className="font-display font-bold tabular-nums">
+                          F-{String(f.numero).padStart(6, "0")}
+                          <span className="ml-2 text-xs font-normal text-tinta-suave">
+                            {fechaCorta(f.created_at)}
+                          </span>
+                        </p>
+                        <p className="text-sm text-tinta-suave">
+                          {f.pedido?.cliente?.full_name ?? "Cliente"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="font-display text-lg font-extrabold tabular-nums">
+                          ${Number(f.monto).toFixed(2)}
+                        </span>
                         {f.pagada ? (
-                          <span className="rounded bg-verde/10 px-2 py-0.5 text-xs font-bold uppercase text-verde">
+                          <span className="rounded bg-verde/10 px-2.5 py-1 text-xs font-bold uppercase text-verde">
                             Pagada
                           </span>
                         ) : (
                           <button
                             onClick={() => marcarPagada(f)}
                             disabled={gestionando === f.id}
-                            className="btn-tactil bg-tinta px-3 py-1.5 text-xs text-white disabled:opacity-50"
+                            className="btn-tactil bg-tinta px-4 py-2 text-sm text-white disabled:opacity-50"
                           >
-                            Marcar pagada
+                            {gestionando === f.id ? "…" : "Marcar pagada"}
                           </button>
                         )}
-                      </td>
-                    </tr>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </section>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ---------- INVENTARIO ---------- */}
+        {pestana === "inventario" && (
+          <section className="mt-5 space-y-3">
+            {almacenes.map((a) => {
+              const esVehiculo = a.tipo.startsWith("veh");
+              return (
+                <div key={a.nombre} className="rounded-lg border border-borde bg-superficie p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      {esVehiculo ? (
+                        <IcoCamion className="h-5 w-5 text-tinta-suave" />
+                      ) : (
+                        <IcoAlmacen className="h-5 w-5 text-tinta-suave" />
+                      )}
+                      <div>
+                        <p className="font-semibold">{a.nombre}</p>
+                        <p className="text-xs capitalize text-tinta-suave">{a.tipo}</p>
+                      </div>
+                    </div>
+                    <p className="font-display text-2xl font-extrabold tabular-nums">
+                      {a.huevos.toLocaleString("es")}
+                    </p>
+                  </div>
+                  <div className="mt-3">
+                    <DesgloseBar huevos={a.huevos} />
+                  </div>
+                </div>
+              );
+            })}
           </section>
         )}
 
-        {/* Inventario por punto */}
-        <section className="mt-8">
-          <p className="eyebrow">Inventario por almacén y vehículo</p>
-          <div className="mt-3 overflow-x-auto rounded-lg border border-borde bg-superficie">
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-borde text-[11px] uppercase tracking-wider text-tinta-suave">
-                  <th className="px-4 py-3 font-bold">Ubicación</th>
-                  <th className="px-4 py-3 text-right font-bold">Huevos</th>
-                  <th className="w-2/5 px-4 py-3 font-bold">Composición</th>
-                </tr>
-              </thead>
-              <tbody>
-                {almacenes.map((a) => {
-                  const esVehiculo = a.tipo.startsWith("veh");
-                  return (
-                    <tr key={a.nombre} className="border-b border-borde last:border-0">
-                      <td className="px-4 py-3.5">
-                        <div className="flex items-center gap-3">
-                          {esVehiculo ? (
-                            <IcoCamion className="h-5 w-5 text-tinta-suave" />
-                          ) : (
-                            <IcoAlmacen className="h-5 w-5 text-tinta-suave" />
-                          )}
-                          <div>
-                            <p className="font-semibold">{a.nombre}</p>
-                            <p className="text-xs capitalize text-tinta-suave">{a.tipo}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3.5 text-right font-display text-lg font-bold tabular-nums">
-                        {a.huevos.toLocaleString("es")}
-                      </td>
-                      <td className="px-4 py-3.5">
-                        <DesgloseBar huevos={a.huevos} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* Ventas recientes */}
-        <section className="mt-8">
-          <p className="eyebrow">Ventas recientes</p>
-          <div className="mt-3 overflow-x-auto rounded-lg border border-borde bg-superficie">
-            <table className="w-full min-w-[420px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-borde text-[11px] uppercase tracking-wider text-tinta-suave">
-                  <th className="px-4 py-3 font-bold">Hora</th>
-                  <th className="px-4 py-3 font-bold">Vendedor</th>
-                  <th className="px-4 py-3 text-right font-bold">Huevos</th>
-                  <th className="px-4 py-3 text-right font-bold">Monto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ventas.map((v, i) => (
-                  <tr key={i} className="border-b border-borde last:border-0">
-                    <td className="px-4 py-3 tabular-nums text-tinta-suave">{v.hora}</td>
-                    <td className="px-4 py-3 font-semibold">{v.vendedor}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {v.huevos.toLocaleString("es")}
-                    </td>
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums text-verde">
-                      ${v.monto.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        {/* ---------- VENTAS ---------- */}
+        {pestana === "ventas" && (
+          <section className="mt-5 overflow-hidden rounded-lg border border-borde bg-superficie">
+            {ventas.length === 0 ? (
+              <p className="p-6 text-center text-sm text-tinta-suave">
+                Sin ventas registradas todavía.
+              </p>
+            ) : (
+              ventas.map((v, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between border-b border-borde px-4 py-3.5 last:border-0"
+                >
+                  <div>
+                    <p className="font-semibold">{v.vendedor}</p>
+                    <p className="text-xs tabular-nums text-tinta-suave">
+                      {v.hora} · {v.huevos.toLocaleString("es")} huevos
+                    </p>
+                  </div>
+                  <span className="font-display text-lg font-extrabold tabular-nums text-verde">
+                    ${v.monto.toFixed(2)}
+                  </span>
+                </div>
+              ))
+            )}
+          </section>
+        )}
 
         {!supabaseConfigurado && (
           <p className="mt-6 rounded-md border-l-2 border-ambar bg-panal p-4 text-sm">
@@ -410,6 +411,35 @@ function AdminDashboard() {
           </p>
         )}
       </main>
+
+      {/* Navegación inferior */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-borde bg-superficie pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto grid max-w-6xl grid-cols-4">
+          {pestanas.map(({ clave, nombre, Icono, badge }) => {
+            const activa = pestana === clave;
+            return (
+              <button
+                key={clave}
+                onClick={() => setPestana(clave)}
+                className={`relative flex cursor-pointer touch-manipulation flex-col items-center gap-1 py-2.5 text-[11px] font-bold ${
+                  activa ? "text-tinta" : "text-tinta-suave"
+                }`}
+              >
+                <span className="relative">
+                  <Icono className={`h-6 w-6 ${activa ? "text-ambar-oscuro" : ""}`} />
+                  {badge ? (
+                    <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rojo px-1 text-[10px] font-bold text-white">
+                      {badge}
+                    </span>
+                  ) : null}
+                </span>
+                {nombre}
+                {activa && <span className="absolute inset-x-6 top-0 h-0.5 rounded-b bg-ambar" />}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </AppShell>
   );
 }

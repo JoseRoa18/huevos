@@ -40,6 +40,11 @@ type Factura = {
   monto: number;
   pagada: boolean;
   created_at: string;
+  pedido: {
+    total_huevos: number;
+    lineas: LineaVenta[];
+    created_at: string;
+  } | null;
 };
 
 const ESTADO_PEDIDO: Record<string, { texto: string; clase: string }> = {
@@ -77,6 +82,7 @@ function PortalCliente() {
 
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [facturas, setFacturas] = useState<Factura[]>([]);
+  const [facturaAbierta, setFacturaAbierta] = useState<Factura | null>(null);
   const [categoria, setCategoria] = useState<CategoriaCliente>("MAYORISTA");
   const [perfil, setPerfil] = useState<{ nombre: string; correo: string }>({
     nombre: "Cliente (demo)",
@@ -120,10 +126,10 @@ function PortalCliente() {
 
       const { data: facts } = await supabase
         .from("facturas")
-        .select("numero, monto, pagada, created_at")
+        .select("numero, monto, pagada, created_at, pedido:pedidos(total_huevos, lineas, created_at)")
         .order("created_at", { ascending: false })
         .limit(30);
-      setFacturas((facts ?? []) as Factura[]);
+      setFacturas((facts ?? []) as unknown as Factura[]);
     })();
   }, []);
 
@@ -346,15 +352,18 @@ function PortalCliente() {
             ) : (
               <div className="mt-4 overflow-hidden rounded-lg border border-borde bg-superficie">
                 {facturas.map((f) => (
-                  <div
+                  <button
                     key={f.numero}
-                    className="flex items-center justify-between border-b border-borde px-4 py-3.5 last:border-0"
+                    onClick={() => setFacturaAbierta(f)}
+                    className="flex w-full cursor-pointer touch-manipulation items-center justify-between border-b border-borde px-4 py-3.5 text-left last:border-0 hover:bg-papel"
                   >
                     <div>
                       <p className="font-display font-bold tabular-nums">
                         F-{String(f.numero).padStart(6, "0")}
                       </p>
-                      <p className="text-xs text-tinta-suave">{fechaCorta(f.created_at)}</p>
+                      <p className="text-xs text-tinta-suave">
+                        {fechaCorta(f.created_at)} · toca para ver el detalle
+                      </p>
                     </div>
                     <div className="text-right">
                       <p className="font-display text-lg font-extrabold tabular-nums">
@@ -368,11 +377,132 @@ function PortalCliente() {
                         {f.pagada ? "Pagada" : "Por pagar"}
                       </span>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             )}
           </>
+        )}
+
+        {/* ---------- DETALLE DE FACTURA (imprimible) ---------- */}
+        {facturaAbierta && (
+          <div className="fixed inset-0 z-40 overflow-y-auto bg-tinta/60 px-4 py-8 print:static print:overflow-visible print:bg-transparent print:p-0">
+            <div className="imprimible mx-auto max-w-md rounded-lg bg-white p-6 shadow-xl print:max-w-none print:rounded-none print:p-0 print:shadow-none">
+              {/* Encabezado */}
+              <div className="flex items-start justify-between border-b-2 border-tinta pb-4">
+                <div>
+                  <p className="font-display text-2xl font-extrabold tracking-tight">
+                    HUEVOS<span className="text-ambar">.</span>
+                  </p>
+                  <p className="text-xs text-tinta-suave">Sistema de distribución</p>
+                </div>
+                <div className="text-right">
+                  <p className="eyebrow">Factura</p>
+                  <p className="font-display text-xl font-extrabold tabular-nums">
+                    F-{String(facturaAbierta.numero).padStart(6, "0")}
+                  </p>
+                </div>
+              </div>
+
+              {/* Datos */}
+              <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="eyebrow">Cliente</p>
+                  <p className="mt-0.5 font-semibold">{perfil.nombre}</p>
+                  <p className="text-xs text-tinta-suave">{perfil.correo}</p>
+                </div>
+                <div className="text-right">
+                  <p className="eyebrow">Emitida</p>
+                  <p className="mt-0.5 font-semibold">
+                    {new Date(facturaAbierta.created_at).toLocaleDateString("es", {
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </p>
+                  <span
+                    className={`text-xs font-bold uppercase ${
+                      facturaAbierta.pagada ? "text-verde" : "text-ambar-oscuro"
+                    }`}
+                  >
+                    {facturaAbierta.pagada ? "Pagada" : "Por pagar"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Líneas */}
+              <table className="mt-5 w-full text-sm">
+                <thead>
+                  <tr className="border-b border-borde text-[11px] uppercase tracking-wider text-tinta-suave">
+                    <th className="py-2 text-left font-bold">Detalle</th>
+                    <th className="py-2 text-right font-bold">Cant.</th>
+                    <th className="py-2 text-right font-bold">Huevos</th>
+                    <th className="py-2 text-right font-bold">Importe</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(facturaAbierta.pedido?.lineas ?? []).map((l) => {
+                    const totalPedido = facturaAbierta.pedido?.total_huevos ?? 1;
+                    const huevosLinea = EMPAQUES[l.empaque].huevos * l.cantidad;
+                    const importe =
+                      (huevosLinea / totalPedido) * Number(facturaAbierta.monto);
+                    return (
+                      <tr key={l.empaque} className="border-b border-borde/60">
+                        <td className="py-2.5">{EMPAQUES[l.empaque].nombre}</td>
+                        <td className="py-2.5 text-right tabular-nums">{l.cantidad}</td>
+                        <td className="py-2.5 text-right tabular-nums">
+                          {huevosLinea.toLocaleString("es")}
+                        </td>
+                        <td className="py-2.5 text-right font-semibold tabular-nums">
+                          ${importe.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+
+              {/* Totales */}
+              <div className="mt-4 space-y-1 text-sm">
+                <div className="flex justify-between text-tinta-suave">
+                  <span>Total en unidad mínima</span>
+                  <span className="tabular-nums">
+                    {(facturaAbierta.pedido?.total_huevos ?? 0).toLocaleString("es")} huevos
+                  </span>
+                </div>
+                <div className="flex justify-between text-tinta-suave">
+                  <span>Equivalencia</span>
+                  <span>{formatoDesglose(facturaAbierta.pedido?.total_huevos ?? 0)}</span>
+                </div>
+                <div className="mt-2 flex items-baseline justify-between border-t-2 border-tinta pt-2">
+                  <span className="font-bold">Total</span>
+                  <span className="font-display text-3xl font-extrabold tabular-nums">
+                    ${Number(facturaAbierta.monto).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              <p className="mt-6 border-t border-borde pt-3 text-center text-xs text-tinta-suave">
+                Gracias por su compra · distrihuevos.vercel.app
+              </p>
+
+              {/* Acciones: no salen en la impresión */}
+              <div className="mt-5 grid grid-cols-2 gap-2 print:hidden">
+                <button
+                  onClick={() => setFacturaAbierta(null)}
+                  className="btn-tactil border border-borde bg-superficie py-3 text-base"
+                >
+                  Cerrar
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="btn-tactil bg-tinta py-3 text-base text-white"
+                >
+                  Imprimir / PDF
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* ---------- PERFIL ---------- */}
