@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+// URL pública del proyecto Supabase (no es un secreto: va inlined en el
+// bundle del cliente). Fija aquí para que el rewrite no dependa de cómo
+// Vercel entrega las variables de entorno durante el build.
+const SUPABASE_URL = "https://fwxowlkgyoymyzzykbbi.supabase.co";
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: __dirname,
@@ -8,8 +11,7 @@ const nextConfig: NextConfig = {
   // contenido cortan peticiones cross-origin a *.supabase.co, pero no las
   // que van al propio dominio de la app.
   async rewrites() {
-    if (!supabaseUrl) return [];
-    return [{ source: "/sb/:path*", destination: `${supabaseUrl}/:path*` }];
+    return [{ source: "/sb/:path*", destination: `${SUPABASE_URL}/:path*` }];
   },
 };
 
