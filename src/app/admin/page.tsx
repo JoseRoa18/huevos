@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatoDesglose } from "@/lib/units";
 import { getSupabaseBrowser, supabaseConfigurado } from "@/lib/supabase/client";
+import RequireRole from "@/components/RequireRole";
 
 type Almacen = { nombre: string; tipo: string; huevos: number };
 type VentaReciente = { hora: string; vendedor: string; huevos: number; monto: number };
@@ -21,7 +22,7 @@ const DEMO_VENTAS: VentaReciente[] = [
   { hora: "10:05", vendedor: "Vendedor 1", huevos: 30, monto: 7.5 },
 ];
 
-export default function AdminDashboard() {
+function AdminDashboard() {
   const [almacenes, setAlmacenes] = useState<Almacen[]>(DEMO_ALMACENES);
   const [ventas, setVentas] = useState<VentaReciente[]>(DEMO_VENTAS);
   const [enVivo, setEnVivo] = useState(false);
@@ -154,5 +155,13 @@ export default function AdminDashboard() {
         </p>
       )}
     </main>
+  );
+}
+
+export default function Page() {
+  return (
+    <RequireRole roles={["admin"]}>
+      <AdminDashboard />
+    </RequireRole>
   );
 }

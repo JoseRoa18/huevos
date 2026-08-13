@@ -12,6 +12,7 @@ import {
   formatoDesglose,
 } from "@/lib/units";
 import { getSupabaseBrowser, supabaseConfigurado } from "@/lib/supabase/client";
+import RequireRole from "@/components/RequireRole";
 
 const ORDEN_POS: EmpaqueClave[] = ["UNIDAD", "MEDIO_CARTON", "CARTON", "CAJA", "PALETA"];
 
@@ -20,7 +21,7 @@ type VentaPendiente = {
   categoria: CategoriaCliente;
 };
 
-export default function VendedorPOS() {
+function VendedorPOS() {
   const [carrito, setCarrito] = useState<LineaVenta[]>([]);
   const [categoria, setCategoria] = useState<CategoriaCliente>("DETAL");
   const [keypadPara, setKeypadPara] = useState<EmpaqueClave | null>(null);
@@ -295,5 +296,13 @@ export default function VendedorPOS() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function Page() {
+  return (
+    <RequireRole roles={["vendedor"]}>
+      <VendedorPOS />
+    </RequireRole>
   );
 }

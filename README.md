@@ -62,9 +62,19 @@ supabase/
   migrations/00001_init.sql  # Esquema, triggers, RPC, RLS, realtime
 ```
 
+## Autenticación
+
+Login en `/login` con Supabase Auth (email + contraseña). El rol vive en la tabla
+`profiles` y las vistas están protegidas con [`RequireRole`](src/components/RequireRole.tsx):
+`/admin` solo admin; `/vendedor` y `/vendedor/merma` para vendedores (el admin
+siempre tiene acceso). Los usuarios nuevos que se registren solos reciben rol
+`cliente`; los roles `admin`/`vendedor` se asignan desde el panel de Supabase o
+por la Admin API. La migración [`00002_auth.sql`](supabase/migrations/00002_auth.sql)
+crea el perfil automáticamente al registrarse y endurece las vistas del dashboard.
+
 ## Roadmap
 
-- [ ] Autenticación con Supabase Auth y asignación de roles
+- [x] Autenticación con Supabase Auth y asignación de roles
 - [ ] Soporte offline-first (cola local + sincronización)
 - [ ] Mapa en vivo de ventas por GPS en el panel admin
 - [ ] Límites de crédito y cobros

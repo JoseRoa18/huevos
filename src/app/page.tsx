@@ -53,6 +53,13 @@ export default function Home() {
         ))}
       </div>
 
+      <Link
+        href="/login"
+        className="btn-pos bg-accion px-10 py-4 text-xl text-white"
+      >
+        🔑 Iniciar sesión
+      </Link>
+
       <footer className="text-sm text-marron-suave">
         1 Cartón = 30 · 1 Caja = 360 · 1 Paleta = 4.320 huevos
       </footer>

@@ -3,8 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { getSupabaseBrowser } from "@/lib/supabase/client";
+import RequireRole from "@/components/RequireRole";
 
-export default function ReportarMerma() {
+function ReportarMerma() {
   const [cantidad, setCantidad] = useState("");
   const [motivo, setMotivo] = useState("");
   const [foto, setFoto] = useState<File | null>(null);
@@ -102,5 +103,13 @@ export default function ReportarMerma() {
         <p className="mt-4 rounded-xl bg-white p-3 text-center text-sm shadow">{mensaje}</p>
       )}
     </main>
+  );
+}
+
+export default function Page() {
+  return (
+    <RequireRole roles={["vendedor"]}>
+      <ReportarMerma />
+    </RequireRole>
   );
 }
