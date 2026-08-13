@@ -109,6 +109,35 @@ export const IcoCandado = ({ className }: P) => (
   </Svg>
 );
 
+export const IcoUsuario = ({ className }: P) => (
+  <Svg className={className}>
+    <circle cx="12" cy="8" r="3.6" />
+    <path d="M5 20c1.4-3.9 3.9-5.8 7-5.8s5.6 1.9 7 5.8" />
+  </Svg>
+);
+
+export const IcoLista = ({ className }: P) => (
+  <Svg className={className}>
+    <path d="M9 6h11M9 12h11M9 18h11" />
+    <path d="M4 6h.01M4 12h.01M4 18h.01" strokeWidth={2.6} />
+  </Svg>
+);
+
+export const IcoRecibo = ({ className }: P) => (
+  <Svg className={className}>
+    <path d="M6.5 3h11v18l-2.2-1.6L13 21l-2.2-1.6L8.7 21l-2.2-1.6V3Z" />
+    <path d="M9.5 8h5M9.5 12h5" />
+  </Svg>
+);
+
+export const IcoCarrito = ({ className }: P) => (
+  <Svg className={className}>
+    <path d="M3.5 4.5h2.2l2.4 11h10.4l2-8H7" />
+    <circle cx="9.5" cy="19.3" r="1.5" />
+    <circle cx="17" cy="19.3" r="1.5" />
+  </Svg>
+);
+
 export const ICONO_EMPAQUE: Record<EmpaqueClave, (p: P) => React.ReactNode> = {
   UNIDAD: IcoHuevo,
   MEDIO_CARTON: IcoMedioCarton,
