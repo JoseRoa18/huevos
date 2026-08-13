@@ -113,6 +113,9 @@ export function getSupabaseBrowser(): SupabaseClient | null {
     if (prefer) u.searchParams.set("prefer", prefer);
     const xu = originales.get("x-upsert");
     if (xu) u.searchParams.set("xu", xu);
+    // Accept es crítico: .single()/.maybeSingle() piden objeto en vez de lista
+    const acc = originales.get("accept");
+    if (acc && acc !== "*/*") u.searchParams.set("acc", acc);
 
     const metodo =
       init?.method ??

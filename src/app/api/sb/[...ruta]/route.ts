@@ -35,7 +35,7 @@ async function manejar(
   // Parámetros de transporte propios: t (token), ct (content-type),
   // prefer y xu (x-upsert). El resto pasa tal cual a Supabase.
   urlEntrante.searchParams.forEach((v, k) => {
-    if (!["t", "ct", "prefer", "xu"].includes(k)) destino.searchParams.append(k, v);
+    if (!["t", "ct", "prefer", "xu", "acc"].includes(k)) destino.searchParams.append(k, v);
   });
 
   const t = urlEntrante.searchParams.get("t");
@@ -50,6 +50,8 @@ async function manejar(
 
   const prefer = urlEntrante.searchParams.get("prefer") ?? req.headers.get("prefer");
   if (prefer) headers["Prefer"] = prefer;
+  const acc = urlEntrante.searchParams.get("acc") ?? req.headers.get("accept");
+  if (acc && acc !== "*/*") headers["Accept"] = acc;
   const xu = urlEntrante.searchParams.get("xu") ?? req.headers.get("x-upsert");
   if (xu) headers["x-upsert"] = xu;
   const rango = req.headers.get("range");
