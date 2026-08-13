@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
-import { esFetchNativo, obtenerFetchConfiable } from "@/lib/supabase/client";
+import { esFetchNativo, obtenerFetchConfiable, fetchPorXhr } from "@/lib/supabase/client";
 
 /**
  * Página de diagnóstico de conectividad. Se abre en cualquier dispositivo
@@ -89,6 +89,24 @@ export default function Diagnostico() {
               body: JSON.stringify({ email: "diagnostico@x.com", password: "x" }),
             });
             return `HTTP ${r.status} — el fetch rescatado funciona`;
+          },
+        ],
+        [
+          "5. fetch sin ningún header (control)",
+          async () => {
+            const r = await fetch("/sb/auth/v1/health");
+            return `HTTP ${r.status} — fetch pelado pasa: el problema son los headers inyectados`;
+          },
+        ],
+        [
+          "6. Canal XHR (respaldo del login)",
+          async () => {
+            const r = await fetchPorXhr("/sb/auth/v1/token?grant_type=password", {
+              method: "POST",
+              headers: { apikey: ANON, "Content-Type": "application/json" },
+              body: JSON.stringify({ email: "diagnostico@x.com", password: "x" }),
+            });
+            return `HTTP ${r.status} — el canal XHR funciona: el login usará esta vía`;
           },
         ],
       ];
