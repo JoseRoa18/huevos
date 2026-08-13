@@ -1,24 +1,51 @@
 @import "tailwindcss";
 
+/* Lenguaje visual: sistema de operaciones agroindustrial.
+   Superficie neutra, tinta verdosa oscura, ámbar-yema solo como acento. */
 @theme {
-  /* Paleta cálida: evoca el producto y lo rural/fresco */
-  --color-crema: #fff8ee;
-  --color-yema: #f5b301;
-  --color-yema-suave: #ffd95c;
-  --color-cascara: #f0e2cc;
-  --color-marron: #4a3524;
-  --color-marron-suave: #8a6f57;
-  --color-accion: #1b5e20; /* verde oscuro: botones Vender / Cobrar */
-  --color-accion-claro: #2e7d32;
-  --color-peligro: #b71c1c;
+  --color-papel: #f5f6f2;
+  --color-superficie: #ffffff;
+  --color-tinta: #171b17;
+  --color-tinta-suave: #5b615a;
+  --color-borde: #e0e3dc;
+  --color-barra: #1d231d;
+  --color-ambar: #d97706;
+  --color-ambar-oscuro: #92400e;
+  --color-panal: #fbf1de;
+  --color-verde: #166534;
+  --color-verde-oscuro: #14532d;
+  --color-rojo: #b91c1c;
+}
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-archivo), var(--font-inter), ui-sans-serif, sans-serif;
 }
 
 body {
-  background-color: var(--color-crema);
-  color: var(--color-marron);
+  background-color: var(--color-papel);
+  color: var(--color-tinta);
+  font-family: var(--font-sans);
 }
 
-/* Accesibilidad en terreno: tipografía grande y alto contraste */
-.btn-pos {
-  @apply rounded-2xl font-bold shadow-md active:scale-95 transition-transform select-none;
+/* Objetivos táctiles para trabajo en calle: grandes, firmes, sin adornos */
+.btn-tactil {
+  @apply rounded-lg font-semibold select-none transition-transform active:scale-[0.98];
+}
+
+/* Etiqueta de sección estilo ficha técnica */
+.eyebrow {
+  @apply text-[11px] font-bold uppercase tracking-[0.16em] text-tinta-suave;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ambar);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

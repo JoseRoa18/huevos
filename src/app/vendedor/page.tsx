@@ -13,6 +13,8 @@ import {
 } from "@/lib/units";
 import { getSupabaseBrowser, supabaseConfigurado } from "@/lib/supabase/client";
 import RequireRole from "@/components/RequireRole";
+import AppShell from "@/components/AppShell";
+import { ICONO_EMPAQUE, IcoAlerta } from "@/components/Icons";
 
 const ORDEN_POS: EmpaqueClave[] = ["UNIDAD", "MEDIO_CARTON", "CARTON", "CAJA", "PALETA"];
 
@@ -27,7 +29,7 @@ function VendedorPOS() {
   const [keypadPara, setKeypadPara] = useState<EmpaqueClave | null>(null);
   const [keypadValor, setKeypadValor] = useState("");
   const [confirmando, setConfirmando] = useState<VentaPendiente | null>(null);
-  const [mensaje, setMensaje] = useState<string | null>(null);
+  const [mensaje, setMensaje] = useState<{ tipo: "ok" | "error"; texto: string } | null>(null);
   const [guardando, setGuardando] = useState(false);
 
   const huevos = useMemo(() => totalHuevos(carrito), [carrito]);
@@ -90,13 +92,14 @@ function VendedorPOS() {
       const { error } = await supabase.rpc("registrar_venta", { venta });
       setMensaje(
         error
-          ? `⚠️ Error al sincronizar: ${error.message}. La venta quedó pendiente.`
-          : `✅ Venta registrada y sincronizada: ${formatoDesglose(venta.total_huevos)}`,
+          ? { tipo: "error", texto: `No se pudo sincronizar la venta: ${error.message}` }
+          : { tipo: "ok", texto: `Venta registrada: ${formatoDesglose(venta.total_huevos)} · $${venta.total_monto.toFixed(2)}` },
       );
     } else {
-      setMensaje(
-        `✅ Venta registrada (modo demo, sin Supabase): ${formatoDesglose(venta.total_huevos)} · $${venta.total_monto.toFixed(2)}`,
-      );
+      setMensaje({
+        tipo: "ok",
+        texto: `Venta registrada en modo demostración: ${formatoDesglose(venta.total_huevos)} · $${venta.total_monto.toFixed(2)}`,
+      });
     }
 
     setCarrito([]);
@@ -105,197 +108,232 @@ function VendedorPOS() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-md px-4 py-6">
-      <header className="flex items-center justify-between">
-        <Link href="/" className="text-sm text-marron-suave">← Inicio</Link>
-        <h1 className="text-xl font-extrabold">🛵 POS Vendedor</h1>
+    <AppShell seccion="Punto de venta">
+      <main className="mx-auto max-w-md px-4 py-6 pb-28">
         {!supabaseConfigurado && (
-          <span className="rounded-full bg-yema-suave px-2 py-1 text-xs font-bold">DEMO</span>
+          <p className="mb-4 rounded-md border-l-2 border-ambar bg-panal px-3 py-2 text-xs font-semibold text-ambar-oscuro">
+            Modo demostración: las ventas no se sincronizan.
+          </p>
         )}
-      </header>
 
-      {/* Categoría del cliente: asigna precios automáticamente */}
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        {(["DETAL", "MAYORISTA", "VIP"] as CategoriaCliente[]).map((c) => (
-          <button
-            key={c}
-            onClick={() => setCategoria(c)}
-            className={`btn-pos py-3 text-sm ${
-              categoria === c
-                ? "bg-marron text-white"
-                : "border-2 border-cascara bg-white"
-            }`}
-          >
-            {c}
-          </button>
-        ))}
-      </div>
-
-      {/* Botones grandes: venta en menos de 3 clics */}
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        {ORDEN_POS.map((clave) => {
-          const e = EMPAQUES[clave];
-          return (
+        {/* Categoría del cliente: define la lista de precios */}
+        <p className="eyebrow">Tipo de cliente</p>
+        <div className="mt-2 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-borde bg-borde">
+          {(["DETAL", "MAYORISTA", "VIP"] as CategoriaCliente[]).map((c) => (
             <button
-              key={clave}
-              onClick={() => agregar(clave, 1)}
-              onContextMenu={(ev) => {
-                ev.preventDefault();
-                setKeypadPara(clave);
-              }}
-              className="btn-pos flex flex-col items-center gap-1 bg-yema py-6 text-marron"
+              key={c}
+              onClick={() => setCategoria(c)}
+              className={`cursor-pointer py-3 text-sm font-bold tracking-wide transition-colors ${
+                categoria === c
+                  ? "bg-tinta text-white"
+                  : "bg-superficie text-tinta-suave hover:text-tinta"
+              }`}
             >
-              <span className="text-3xl">{e.emoji}</span>
-              <span className="text-lg">{e.nombre}</span>
-              <span className="text-xs opacity-70">{e.huevos} huevos</span>
+              {c}
             </button>
-          );
-        })}
-        <button
-          onClick={() => setKeypadPara("CARTON")}
-          className="btn-pos border-4 border-dashed border-yema bg-white py-6 text-lg"
-        >
-          🔢 Cantidad…
-        </button>
-      </div>
-
-      {/* Carrito */}
-      <section className="mt-5 rounded-2xl border-2 border-cascara bg-white p-4">
-        <h2 className="text-sm font-bold uppercase tracking-wide text-marron-suave">Carrito</h2>
-        {carrito.length === 0 ? (
-          <p className="mt-2 text-marron-suave">Toca un empaque para agregar.</p>
-        ) : (
-          <ul className="mt-2 space-y-2">
-            {carrito.map((l) => (
-              <li key={l.empaque} className="flex items-center justify-between text-lg">
-                <span>
-                  {EMPAQUES[l.empaque].emoji} {l.cantidad} × {EMPAQUES[l.empaque].nombre}
-                </span>
-                <button
-                  onClick={() =>
-                    setCarrito((prev) => prev.filter((x) => x.empaque !== l.empaque))
-                  }
-                  className="text-peligro"
-                  aria-label={`Quitar ${EMPAQUES[l.empaque].nombre}`}
-                >
-                  ✕
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="mt-3 border-t border-cascara pt-3 text-lg font-bold">
-          <div className="flex justify-between">
-            <span>Total huevos</span>
-            <span>{huevos.toLocaleString("es")}</span>
-          </div>
-          <div className="flex justify-between text-2xl text-accion">
-            <span>Total</span>
-            <span>${monto.toFixed(2)}</span>
-          </div>
+          ))}
         </div>
-      </section>
 
-      <button
-        disabled={carrito.length === 0}
-        onClick={() => setConfirmando({ lineas: carrito, categoria })}
-        className="btn-pos mt-4 w-full bg-accion py-5 text-2xl text-white disabled:opacity-40"
-      >
-        💰 VENDER
-      </button>
-
-      <Link
-        href="/vendedor/merma"
-        className="btn-pos mt-3 block w-full border-2 border-peligro bg-white py-3 text-center text-peligro"
-      >
-        🥚💔 Reportar Merma
-      </Link>
-
-      {mensaje && (
-        <p className="mt-4 rounded-xl bg-white p-3 text-center text-sm shadow">{mensaje}</p>
-      )}
-
-      {/* Teclado numérico propio, grande, tipo cajero */}
-      {keypadPara && (
-        <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-t-3xl bg-white p-5">
-            <p className="text-center text-lg font-bold">
-              ¿Cuántos {EMPAQUES[keypadPara].nombre}?
-            </p>
-            <p className="my-3 rounded-xl bg-crema py-3 text-center text-4xl font-extrabold">
-              {keypadValor || "0"}
-            </p>
-            <div className="grid grid-cols-3 gap-2">
-              {["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"].map((t) => (
-                <button
-                  key={t}
-                  onClick={() => teclaKeypad(t)}
-                  className="btn-pos bg-cascara py-5 text-2xl"
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
+        {/* Empaques: objetivo táctil grande, venta en tres toques */}
+        <p className="eyebrow mt-6">Agregar al despacho</p>
+        <div className="mt-2 grid grid-cols-2 gap-2.5">
+          {ORDEN_POS.map((clave) => {
+            const e = EMPAQUES[clave];
+            const Icono = ICONO_EMPAQUE[clave];
+            return (
               <button
-                onClick={() => { setKeypadPara(null); setKeypadValor(""); }}
-                className="btn-pos border-2 border-cascara bg-white py-4 text-lg"
+                key={clave}
+                onClick={() => agregar(clave, 1)}
+                onContextMenu={(ev) => {
+                  ev.preventDefault();
+                  setKeypadPara(clave);
+                }}
+                className="btn-tactil cursor-pointer border border-borde bg-superficie p-4 text-left hover:border-ambar"
               >
-                Cancelar
+                <Icono className="h-7 w-7 text-ambar-oscuro" />
+                <p className="mt-2.5 font-display text-base font-bold leading-tight">
+                  {clave === "CAJA" ? "Caja" : clave === "PALETA" ? "Paleta" : e.nombre}
+                </p>
+                <p className="text-xs tabular-nums text-tinta-suave">
+                  {e.huevos.toLocaleString("es")} {e.huevos === 1 ? "huevo" : "huevos"}
+                </p>
               </button>
-              <button
-                onClick={confirmarKeypad}
-                className="btn-pos bg-accion py-4 text-lg text-white"
-              >
-                Agregar
-              </button>
-            </div>
-          </div>
+            );
+          })}
+          <button
+            onClick={() => setKeypadPara("CARTON")}
+            className="btn-tactil cursor-pointer border border-dashed border-tinta-suave/50 bg-transparent p-4 text-left hover:border-ambar"
+          >
+            <p className="font-display text-2xl font-bold text-tinta-suave">123</p>
+            <p className="mt-1 text-sm font-semibold">Otra cantidad</p>
+            <p className="text-xs text-tinta-suave">elige empaque y número</p>
+          </button>
         </div>
-      )}
 
-      {/* Confirmación visual antes de cerrar: evita errores de dedo */}
-      {confirmando && (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-md rounded-3xl bg-white p-6">
-            <h3 className="text-center text-xl font-extrabold">Confirmar venta</h3>
-            <ul className="mt-4 space-y-1 text-lg">
-              {confirmando.lineas.map((l) => (
-                <li key={l.empaque} className="flex justify-between">
-                  <span>{l.cantidad} × {EMPAQUES[l.empaque].nombre}</span>
-                  <span className="text-marron-suave">
-                    {(EMPAQUES[l.empaque].huevos * l.cantidad).toLocaleString("es")} huevos
+        {/* Despacho actual */}
+        <section className="mt-6 rounded-lg border border-borde bg-superficie">
+          <p className="border-b border-borde px-4 py-2.5 text-[11px] font-bold uppercase tracking-[0.16em] text-tinta-suave">
+            Despacho actual
+          </p>
+          {carrito.length === 0 ? (
+            <p className="px-4 py-5 text-sm text-tinta-suave">
+              Sin líneas todavía. Toca un empaque para agregarlo; mantén pulsado
+              (o clic derecho) para indicar cantidad.
+            </p>
+          ) : (
+            <ul>
+              {carrito.map((l) => (
+                <li
+                  key={l.empaque}
+                  className="flex items-center justify-between border-b border-borde px-4 py-3 last:border-0"
+                >
+                  <span className="text-base">
+                    <span className="font-display font-bold tabular-nums">{l.cantidad} ×</span>{" "}
+                    {EMPAQUES[l.empaque].nombre}
+                  </span>
+                  <span className="flex items-center gap-3">
+                    <span className="text-sm tabular-nums text-tinta-suave">
+                      {(EMPAQUES[l.empaque].huevos * l.cantidad).toLocaleString("es")}
+                    </span>
+                    <button
+                      onClick={() =>
+                        setCarrito((prev) => prev.filter((x) => x.empaque !== l.empaque))
+                      }
+                      className="cursor-pointer rounded px-1.5 text-lg leading-none text-tinta-suave hover:text-rojo"
+                      aria-label={`Quitar ${EMPAQUES[l.empaque].nombre}`}
+                    >
+                      ×
+                    </button>
                   </span>
                 </li>
               ))}
             </ul>
-            <div className="mt-4 rounded-2xl bg-crema p-4 text-center">
-              <p className="text-sm text-marron-suave">
-                {formatoDesglose(totalHuevos(confirmando.lineas))} · Cliente {confirmando.categoria}
-              </p>
-              <p className="text-4xl font-extrabold text-accion">
-                ${precioLineas(confirmando.lineas, confirmando.categoria).toFixed(2)}
-              </p>
+          )}
+          <div className="border-t border-borde bg-papel px-4 py-3">
+            <div className="flex justify-between text-sm">
+              <span className="text-tinta-suave">Total en unidad mínima</span>
+              <span className="font-semibold tabular-nums">{huevos.toLocaleString("es")} huevos</span>
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setConfirmando(null)}
-                className="btn-pos border-2 border-cascara bg-white py-4 text-lg"
-              >
-                Volver
-              </button>
-              <button
-                onClick={registrarVenta}
-                disabled={guardando}
-                className="btn-pos bg-accion py-4 text-lg text-white disabled:opacity-50"
-              >
-                {guardando ? "Guardando…" : "✅ Confirmar"}
-              </button>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="font-semibold">Total {categoria.toLowerCase()}</span>
+              <span className="font-display text-3xl font-extrabold tabular-nums text-verde">
+                ${monto.toFixed(2)}
+              </span>
             </div>
           </div>
-        </div>
-      )}
-    </main>
+        </section>
+
+        <button
+          disabled={carrito.length === 0}
+          onClick={() => setConfirmando({ lineas: carrito, categoria })}
+          className="btn-tactil mt-4 w-full cursor-pointer bg-verde py-4 text-xl text-white hover:bg-verde-oscuro disabled:opacity-40"
+        >
+          Registrar venta
+        </button>
+
+        <Link
+          href="/vendedor/merma"
+          className="btn-tactil mt-3 flex w-full cursor-pointer items-center justify-center gap-2 border border-rojo/40 bg-superficie py-3 text-rojo hover:border-rojo"
+        >
+          <IcoAlerta className="h-5 w-5" />
+          Reportar merma
+        </Link>
+
+        {mensaje && (
+          <p
+            className={`mt-4 rounded-md border-l-2 p-3 text-sm font-medium ${
+              mensaje.tipo === "ok"
+                ? "border-verde bg-verde/5 text-verde-oscuro"
+                : "border-rojo bg-rojo/5 text-rojo"
+            }`}
+          >
+            {mensaje.texto}
+          </p>
+        )}
+
+        {/* Teclado numérico propio: teclas grandes tipo cajero */}
+        {keypadPara && (
+          <div className="fixed inset-0 z-20 flex items-end justify-center bg-tinta/60">
+            <div className="w-full max-w-md rounded-t-xl border-t border-borde bg-superficie p-5">
+              <p className="eyebrow">Cantidad de {EMPAQUES[keypadPara].nombre}</p>
+              <p className="my-3 rounded-md bg-papel py-3 text-center font-display text-4xl font-extrabold tabular-nums">
+                {keypadValor || "0"}
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"].map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => teclaKeypad(t)}
+                    className="btn-tactil cursor-pointer border border-borde bg-papel py-4 text-2xl tabular-nums hover:border-ambar"
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { setKeypadPara(null); setKeypadValor(""); }}
+                  className="btn-tactil cursor-pointer border border-borde bg-superficie py-3.5 text-base"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarKeypad}
+                  className="btn-tactil cursor-pointer bg-tinta py-3.5 text-base text-white"
+                >
+                  Agregar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmación antes de cerrar: evita errores de dedo */}
+        {confirmando && (
+          <div className="fixed inset-0 z-30 flex items-center justify-center bg-tinta/60 px-4">
+            <div className="w-full max-w-md rounded-xl border border-borde bg-superficie p-6">
+              <p className="eyebrow">Confirmar venta · Cliente {confirmando.categoria.toLowerCase()}</p>
+              <ul className="mt-4 space-y-1.5">
+                {confirmando.lineas.map((l) => (
+                  <li key={l.empaque} className="flex justify-between text-base">
+                    <span>
+                      <span className="font-display font-bold tabular-nums">{l.cantidad} ×</span>{" "}
+                      {EMPAQUES[l.empaque].nombre}
+                    </span>
+                    <span className="tabular-nums text-tinta-suave">
+                      {(EMPAQUES[l.empaque].huevos * l.cantidad).toLocaleString("es")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 rounded-lg bg-papel p-4">
+                <p className="text-sm text-tinta-suave">
+                  {formatoDesglose(totalHuevos(confirmando.lineas))}
+                </p>
+                <p className="mt-1 font-display text-4xl font-extrabold tabular-nums text-verde">
+                  ${precioLineas(confirmando.lineas, confirmando.categoria).toFixed(2)}
+                </p>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setConfirmando(null)}
+                  className="btn-tactil cursor-pointer border border-borde bg-superficie py-3.5 text-base"
+                >
+                  Volver
+                </button>
+                <button
+                  onClick={registrarVenta}
+                  disabled={guardando}
+                  className="btn-tactil cursor-pointer bg-verde py-3.5 text-base text-white hover:bg-verde-oscuro disabled:opacity-50"
+                >
+                  {guardando ? "Registrando…" : "Confirmar venta"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </AppShell>
   );
 }
 

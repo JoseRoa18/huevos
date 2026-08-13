@@ -8,7 +8,7 @@ type Rol = "admin" | "vendedor" | "cliente";
 
 /**
  * Protege una vista por rol. El admin siempre tiene acceso.
- * Sin Supabase configurado (modo demo) deja pasar para poder probar la UI.
+ * Sin Supabase configurado (modo demostración) deja pasar para probar la UI.
  */
 export default function RequireRole({
   roles,
@@ -64,23 +64,28 @@ export default function RequireRole({
 
   if (estado === "cargando") {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p className="animate-pulse text-2xl">🥚 Verificando acceso…</p>
+      <main className="flex min-h-screen items-center justify-center bg-papel">
+        <p className="animate-pulse text-sm font-semibold uppercase tracking-[0.16em] text-tinta-suave">
+          Verificando sesión…
+        </p>
       </main>
     );
   }
 
   return (
-    <>
+    <div className="relative">
       {estado === "ok" && (
-        <div className="fixed right-3 top-3 z-40 flex items-center gap-2 rounded-full border-2 border-cascara bg-white px-3 py-1 text-sm shadow">
-          <span className="font-bold">{nombre}</span>
-          <button onClick={salir} className="text-peligro underline">
+        <div className="absolute right-5 top-0 z-40 flex h-14 items-center gap-3 text-sm text-white/85">
+          <span className="font-semibold">{nombre}</span>
+          <button
+            onClick={salir}
+            className="cursor-pointer rounded border border-white/25 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide hover:border-white/60"
+          >
             Salir
           </button>
         </div>
       )}
       {children}
-    </>
+    </div>
   );
 }

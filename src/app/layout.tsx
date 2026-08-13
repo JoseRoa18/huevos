@@ -1,10 +1,14 @@
 import type { Metadata, Viewport } from "next";
+import { Archivo, Inter } from "next/font/google";
 import "./globals.css";
 
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const archivo = Archivo({ subsets: ["latin"], variable: "--font-archivo", display: "swap" });
+
 export const metadata: Metadata = {
-  title: "Huevos · Gestión de Ventas e Inventario",
+  title: "Huevos · Sistema de Distribución",
   description:
-    "Sistema de ventas e inventario de huevos en tiempo real: administrador, vendedores y clientes sobre una misma base de datos.",
+    "Sistema de ventas e inventario en tiempo real para distribución de huevos: administración, fuerza de ventas y clientes sobre una misma base de datos.",
 };
 
 export const viewport: Viewport = {
@@ -16,7 +20,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="es">
+    <html lang="es" className={`${inter.variable} ${archivo.variable}`}>
       <body className="min-h-screen antialiased">{children}</body>
     </html>
   );

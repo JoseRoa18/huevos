@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { formatoDesglose } from "@/lib/units";
 import { getSupabaseBrowser, supabaseConfigurado } from "@/lib/supabase/client";
 import RequireRole from "@/components/RequireRole";
+import AppShell from "@/components/AppShell";
+import DesgloseBar from "@/components/DesgloseBar";
+import { IcoAlmacen, IcoCamion } from "@/components/Icons";
 
 type Almacen = { nombre: string; tipo: string; huevos: number };
 type VentaReciente = { hora: string; vendedor: string; huevos: number; monto: number };
 
-// Datos de ejemplo mientras Supabase no está conectado
+// Datos de demostración mientras Supabase no está conectado
 const DEMO_ALMACENES: Almacen[] = [
   { nombre: "Almacén Central", tipo: "almacén", huevos: 51840 },
   { nombre: "Camión — Vendedor 1", tipo: "vehículo", huevos: 4320 },
@@ -45,7 +46,7 @@ function AdminDashboard() {
     }
     cargar();
 
-    // Sincronización en tiempo real: cualquier venta refresca el dashboard
+    // Sincronización en tiempo real: cualquier venta refresca el panel
     const canal = supabase
       .channel("dashboard")
       .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, cargar)
@@ -61,100 +62,138 @@ function AdminDashboard() {
   const ventasHoy = ventas.reduce((a, v) => a + v.monto, 0);
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-6 py-8">
-      <header className="flex items-center justify-between">
-        <Link href="/" className="text-sm text-marron-suave">← Inicio</Link>
-        <h1 className="text-2xl font-extrabold">📊 Panel Administrador</h1>
-        <span
-          className={`rounded-full px-3 py-1 text-xs font-bold ${
-            enVivo ? "bg-accion text-white" : "bg-yema-suave"
-          }`}
-        >
-          {enVivo ? "● EN VIVO" : supabaseConfigurado ? "conectando…" : "DEMO"}
-        </span>
-      </header>
+    <AppShell seccion="Panel de operaciones">
+      <main className="mx-auto max-w-6xl px-5 py-8">
+        <div className="flex items-center justify-between">
+          <h1 className="font-display text-2xl font-bold">Operación en curso</h1>
+          <span
+            className={`flex items-center gap-2 rounded-md border px-3 py-1 text-xs font-bold uppercase tracking-wide ${
+              enVivo
+                ? "border-verde/30 bg-verde/5 text-verde"
+                : "border-ambar/40 bg-panal text-ambar-oscuro"
+            }`}
+          >
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${enVivo ? "animate-pulse bg-verde" : "bg-ambar"}`}
+            />
+            {enVivo ? "En vivo" : supabaseConfigurado ? "Conectando" : "Demostración"}
+          </span>
+        </div>
 
-      {/* Tarjetas de resumen */}
-      <section className="mt-6 grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border-2 border-cascara bg-white p-5">
-          <p className="text-sm font-bold uppercase text-marron-suave">Inventario total</p>
-          <p className="mt-1 text-4xl font-extrabold">{totalHuevos.toLocaleString("es")}</p>
-          <p className="mt-1 text-sm text-marron-suave">{formatoDesglose(totalHuevos)}</p>
-        </div>
-        <div className="rounded-2xl border-2 border-cascara bg-white p-5">
-          <p className="text-sm font-bold uppercase text-marron-suave">Ventas (últimas)</p>
-          <p className="mt-1 text-4xl font-extrabold text-accion">${ventasHoy.toFixed(2)}</p>
-          <p className="mt-1 text-sm text-marron-suave">{ventas.length} transacciones</p>
-        </div>
-        <div className="rounded-2xl border-2 border-cascara bg-white p-5">
-          <p className="text-sm font-bold uppercase text-marron-suave">Almacenes / Vehículos</p>
-          <p className="mt-1 text-4xl font-extrabold">{almacenes.length}</p>
-          <p className="mt-1 text-sm text-marron-suave">inventario asignado por unidad</p>
-        </div>
-      </section>
+        {/* Indicadores principales */}
+        <section className="mt-6 grid gap-px overflow-hidden rounded-lg border border-borde bg-borde sm:grid-cols-3">
+          <div className="bg-superficie p-5">
+            <p className="eyebrow">Inventario total</p>
+            <p className="mt-2 font-display text-4xl font-extrabold tabular-nums">
+              {totalHuevos.toLocaleString("es")}
+            </p>
+            <div className="mt-3">
+              <DesgloseBar huevos={totalHuevos} />
+            </div>
+          </div>
+          <div className="bg-superficie p-5">
+            <p className="eyebrow">Ventas registradas</p>
+            <p className="mt-2 font-display text-4xl font-extrabold tabular-nums text-verde">
+              ${ventasHoy.toFixed(2)}
+            </p>
+            <p className="mt-3 text-xs text-tinta-suave">
+              {ventas.length} transacciones recientes
+            </p>
+          </div>
+          <div className="bg-superficie p-5">
+            <p className="eyebrow">Puntos de inventario</p>
+            <p className="mt-2 font-display text-4xl font-extrabold tabular-nums">
+              {almacenes.length}
+            </p>
+            <p className="mt-3 text-xs text-tinta-suave">
+              almacenes y vehículos con stock asignado
+            </p>
+          </div>
+        </section>
 
-      {/* Inventario por almacén / vehículo */}
-      <section className="mt-8">
-        <h2 className="text-lg font-bold">Inventario por Almacén / Vehículo</h2>
-        <div className="mt-3 overflow-x-auto rounded-2xl border-2 border-cascara bg-white">
-          <table className="w-full text-left">
-            <thead className="bg-crema text-sm uppercase text-marron-suave">
-              <tr>
-                <th className="p-3">Ubicación</th>
-                <th className="p-3">Tipo</th>
-                <th className="p-3 text-right">Huevos</th>
-                <th className="p-3">Equivalencia</th>
-              </tr>
-            </thead>
-            <tbody>
-              {almacenes.map((a) => (
-                <tr key={a.nombre} className="border-t border-cascara">
-                  <td className="p-3 font-bold">{a.nombre}</td>
-                  <td className="p-3">{a.tipo === "vehículo" || a.tipo === "vehiculo" ? "🚚" : "🏭"} {a.tipo}</td>
-                  <td className="p-3 text-right font-mono">{a.huevos.toLocaleString("es")}</td>
-                  <td className="p-3 text-sm text-marron-suave">{formatoDesglose(a.huevos)}</td>
+        {/* Inventario por punto */}
+        <section className="mt-8">
+          <p className="eyebrow">Inventario por almacén y vehículo</p>
+          <div className="mt-3 overflow-x-auto rounded-lg border border-borde bg-superficie">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-borde text-[11px] uppercase tracking-wider text-tinta-suave">
+                  <th className="px-4 py-3 font-bold">Ubicación</th>
+                  <th className="px-4 py-3 text-right font-bold">Huevos</th>
+                  <th className="w-2/5 px-4 py-3 font-bold">Composición</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody>
+                {almacenes.map((a) => {
+                  const esVehiculo = a.tipo.startsWith("veh");
+                  return (
+                    <tr key={a.nombre} className="border-b border-borde last:border-0">
+                      <td className="px-4 py-3.5">
+                        <div className="flex items-center gap-3">
+                          {esVehiculo ? (
+                            <IcoCamion className="h-5 w-5 text-tinta-suave" />
+                          ) : (
+                            <IcoAlmacen className="h-5 w-5 text-tinta-suave" />
+                          )}
+                          <div>
+                            <p className="font-semibold">{a.nombre}</p>
+                            <p className="text-xs capitalize text-tinta-suave">{a.tipo}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3.5 text-right font-display text-lg font-bold tabular-nums">
+                        {a.huevos.toLocaleString("es")}
+                      </td>
+                      <td className="px-4 py-3.5">
+                        <DesgloseBar huevos={a.huevos} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-      {/* Ventas recientes */}
-      <section className="mt-8">
-        <h2 className="text-lg font-bold">Ventas Recientes</h2>
-        <div className="mt-3 overflow-x-auto rounded-2xl border-2 border-cascara bg-white">
-          <table className="w-full text-left">
-            <thead className="bg-crema text-sm uppercase text-marron-suave">
-              <tr>
-                <th className="p-3">Hora</th>
-                <th className="p-3">Vendedor</th>
-                <th className="p-3 text-right">Huevos</th>
-                <th className="p-3 text-right">Monto</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ventas.map((v, i) => (
-                <tr key={i} className="border-t border-cascara">
-                  <td className="p-3 font-mono">{v.hora}</td>
-                  <td className="p-3">{v.vendedor}</td>
-                  <td className="p-3 text-right font-mono">{v.huevos.toLocaleString("es")}</td>
-                  <td className="p-3 text-right font-bold text-accion">${v.monto.toFixed(2)}</td>
+        {/* Ventas recientes */}
+        <section className="mt-8">
+          <p className="eyebrow">Ventas recientes</p>
+          <div className="mt-3 overflow-x-auto rounded-lg border border-borde bg-superficie">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-borde text-[11px] uppercase tracking-wider text-tinta-suave">
+                  <th className="px-4 py-3 font-bold">Hora</th>
+                  <th className="px-4 py-3 font-bold">Vendedor</th>
+                  <th className="px-4 py-3 text-right font-bold">Huevos</th>
+                  <th className="px-4 py-3 text-right font-bold">Monto</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody>
+                {ventas.map((v, i) => (
+                  <tr key={i} className="border-b border-borde last:border-0">
+                    <td className="px-4 py-3 tabular-nums text-tinta-suave">{v.hora}</td>
+                    <td className="px-4 py-3 font-semibold">{v.vendedor}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {v.huevos.toLocaleString("es")}
+                    </td>
+                    <td className="px-4 py-3 text-right font-semibold tabular-nums text-verde">
+                      ${v.monto.toFixed(2)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-      {!supabaseConfigurado && (
-        <p className="mt-6 rounded-xl bg-yema-suave/40 p-4 text-sm">
-          ⚠️ Mostrando <b>datos de ejemplo</b>. Conecta Supabase (variables{" "}
-          <code>NEXT_PUBLIC_SUPABASE_URL</code> y <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>)
-          para ver el inventario y las ventas en tiempo real.
-        </p>
-      )}
-    </main>
+        {!supabaseConfigurado && (
+          <p className="mt-6 rounded-md border-l-2 border-ambar bg-panal p-4 text-sm">
+            Datos de demostración. Configura <code>NEXT_PUBLIC_SUPABASE_URL</code> y{" "}
+            <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> para operar con inventario real.
+          </p>
+        )}
+      </main>
+    </AppShell>
   );
 }
 

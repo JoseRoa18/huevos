@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { getSupabaseBrowser, supabaseConfigurado } from "@/lib/supabase/client";
+import { IcoCandado } from "@/components/Icons";
 
 const RUTA_POR_ROL: Record<string, string> = {
   admin: "/admin",
@@ -26,7 +27,7 @@ function FormularioLogin() {
     setError(null);
     const supabase = getSupabaseBrowser();
     if (!supabase) {
-      setError("Supabase no está configurado (modo demo): las vistas están abiertas sin login.");
+      setError("Supabase no está configurado: las vistas están abiertas en modo demostración.");
       return;
     }
     setEntrando(true);
@@ -51,56 +52,63 @@ function FormularioLogin() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-10">
-      <div className="text-center">
-        <Link href="/" className="text-6xl">🥚</Link>
-        <h1 className="mt-3 text-3xl font-extrabold">Iniciar sesión</h1>
-        <p className="mt-1 text-marron-suave">Cada rol entra a su propia vista.</p>
-      </div>
+    <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center px-5 py-10">
+      <Link href="/" className="font-display text-2xl font-extrabold tracking-tight">
+        HUEVOS<span className="text-ambar">.</span>
+      </Link>
+      <h1 className="mt-6 font-display text-3xl font-bold">Iniciar sesión</h1>
+      <p className="mt-1 text-sm text-tinta-suave">
+        El sistema te llevará a la vista de tu rol.
+      </p>
 
-      <form onSubmit={entrar} className="mt-8 space-y-4 rounded-3xl border-2 border-cascara bg-white p-6 shadow-sm">
+      <form
+        onSubmit={entrar}
+        className="mt-6 space-y-4 rounded-lg border border-borde bg-superficie p-6"
+      >
         <label className="block">
-          <span className="text-sm font-bold">Correo</span>
+          <span className="eyebrow">Correo</span>
           <input
             type="email"
             required
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-xl border-2 border-cascara p-4 text-lg"
-            placeholder="tu@correo.com"
+            className="mt-1.5 w-full rounded-md border border-borde bg-superficie p-3.5 text-lg"
+            placeholder="nombre@empresa.com"
           />
         </label>
 
         <label className="block">
-          <span className="text-sm font-bold">Contraseña</span>
+          <span className="eyebrow">Contraseña</span>
           <input
             type="password"
             required
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-xl border-2 border-cascara p-4 text-lg"
-            placeholder="••••••••"
+            className="mt-1.5 w-full rounded-md border border-borde bg-superficie p-3.5 text-lg"
           />
         </label>
 
         {error && (
-          <p className="rounded-xl bg-peligro/10 p-3 text-sm font-bold text-peligro">{error}</p>
+          <p className="rounded-md border-l-2 border-rojo bg-rojo/5 p-3 text-sm font-medium text-rojo">
+            {error}
+          </p>
         )}
 
         <button
           type="submit"
           disabled={entrando}
-          className="btn-pos w-full bg-accion py-4 text-xl text-white disabled:opacity-50"
+          className="btn-tactil flex w-full items-center justify-center gap-2 bg-verde py-3.5 text-lg text-white hover:bg-verde-oscuro disabled:opacity-50"
         >
-          {entrando ? "Entrando…" : "Entrar"}
+          <IcoCandado className="h-5 w-5" />
+          {entrando ? "Verificando…" : "Entrar"}
         </button>
       </form>
 
       {!supabaseConfigurado && (
-        <p className="mt-4 text-center text-sm text-marron-suave">
-          Modo demo activo: puedes navegar sin iniciar sesión.
+        <p className="mt-4 text-center text-sm text-tinta-suave">
+          Modo demostración activo: puedes navegar sin iniciar sesión.
         </p>
       )}
     </main>
