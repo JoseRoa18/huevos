@@ -75,11 +75,11 @@ export default function RequireRole({
   return (
     <div className="relative">
       {estado === "ok" && (
-        <div className="absolute right-5 top-0 z-40 flex h-14 items-center gap-3 text-sm text-white/85">
-          <span className="font-semibold">{nombre}</span>
+        <div className="absolute right-4 top-0 z-40 flex h-14 items-center gap-3 text-sm text-white/85 sm:right-5">
+          <span className="hidden max-w-36 truncate font-semibold sm:inline">{nombre}</span>
           <button
             onClick={salir}
-            className="cursor-pointer rounded border border-white/25 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide hover:border-white/60"
+            className="cursor-pointer touch-manipulation rounded border border-white/25 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide hover:border-white/60"
           >
             Salir
           </button>

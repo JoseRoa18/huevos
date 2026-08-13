@@ -115,7 +115,7 @@ function AdminDashboard() {
         <section className="mt-8">
           <p className="eyebrow">Inventario por almacén y vehículo</p>
           <div className="mt-3 overflow-x-auto rounded-lg border border-borde bg-superficie">
-            <table className="w-full text-left text-sm">
+            <table className="w-full min-w-[520px] text-left text-sm">
               <thead>
                 <tr className="border-b border-borde text-[11px] uppercase tracking-wider text-tinta-suave">
                   <th className="px-4 py-3 font-bold">Ubicación</th>
@@ -159,7 +159,7 @@ function AdminDashboard() {
         <section className="mt-8">
           <p className="eyebrow">Ventas recientes</p>
           <div className="mt-3 overflow-x-auto rounded-lg border border-borde bg-superficie">
-            <table className="w-full text-left text-sm">
+            <table className="w-full min-w-[420px] text-left text-sm">
               <thead>
                 <tr className="border-b border-borde text-[11px] uppercase tracking-wider text-tinta-suave">
                   <th className="px-4 py-3 font-bold">Hora</th>

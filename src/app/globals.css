@@ -28,9 +28,10 @@ body {
   font-family: var(--font-sans);
 }
 
-/* Objetivos táctiles para trabajo en calle: grandes, firmes, sin adornos */
+/* Objetivos táctiles para trabajo en calle: grandes, firmes, sin adornos.
+   touch-manipulation elimina el retraso de doble tap en móvil. */
 .btn-tactil {
-  @apply rounded-lg font-semibold select-none transition-transform active:scale-[0.98];
+  @apply cursor-pointer rounded-lg font-semibold select-none transition-transform active:scale-[0.98] touch-manipulation;
 }
 
 /* Etiqueta de sección estilo ficha técnica */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   EMPAQUES,
@@ -18,6 +18,14 @@ import { ICONO_EMPAQUE, IcoAlerta } from "@/components/Icons";
 
 const ORDEN_POS: EmpaqueClave[] = ["UNIDAD", "MEDIO_CARTON", "CARTON", "CAJA", "PALETA"];
 
+const NOMBRE_CORTO: Record<EmpaqueClave, string> = {
+  UNIDAD: "Unidad",
+  MEDIO_CARTON: "½ Cartón",
+  CARTON: "Cartón",
+  CAJA: "Caja",
+  PALETA: "Paleta",
+};
+
 type VentaPendiente = {
   lineas: LineaVenta[];
   categoria: CategoriaCliente;
@@ -34,6 +42,25 @@ function VendedorPOS() {
 
   const huevos = useMemo(() => totalHuevos(carrito), [carrito]);
   const monto = useMemo(() => precioLineas(carrito, categoria), [carrito, categoria]);
+
+  // Long-press multiplataforma (iOS no dispara contextmenu): toque corto
+  // agrega 1, toque sostenido (450 ms) abre el teclado de cantidad.
+  const temporizador = useRef<number | null>(null);
+
+  function iniciarPulsacion(clave: EmpaqueClave) {
+    temporizador.current = window.setTimeout(() => {
+      temporizador.current = null;
+      setKeypadPara(clave);
+    }, 450);
+  }
+
+  function soltarPulsacion(clave?: EmpaqueClave) {
+    if (temporizador.current !== null) {
+      clearTimeout(temporizador.current);
+      temporizador.current = null;
+      if (clave) agregar(clave, 1);
+    }
+  }
 
   function agregar(empaque: EmpaqueClave, cantidad: number) {
     if (cantidad <= 0) return;
@@ -143,12 +170,12 @@ function VendedorPOS() {
             return (
               <button
                 key={clave}
-                onClick={() => agregar(clave, 1)}
-                onContextMenu={(ev) => {
-                  ev.preventDefault();
-                  setKeypadPara(clave);
-                }}
-                className="btn-tactil cursor-pointer border border-borde bg-superficie p-4 text-left hover:border-ambar"
+                onPointerDown={() => iniciarPulsacion(clave)}
+                onPointerUp={() => soltarPulsacion(clave)}
+                onPointerLeave={() => soltarPulsacion()}
+                onPointerCancel={() => soltarPulsacion()}
+                onContextMenu={(ev) => ev.preventDefault()}
+                className="btn-tactil border border-borde bg-superficie p-4 text-left hover:border-ambar"
               >
                 <Icono className="h-7 w-7 text-ambar-oscuro" />
                 <p className="mt-2.5 font-display text-base font-bold leading-tight">
@@ -162,11 +189,11 @@ function VendedorPOS() {
           })}
           <button
             onClick={() => setKeypadPara("CARTON")}
-            className="btn-tactil cursor-pointer border border-dashed border-tinta-suave/50 bg-transparent p-4 text-left hover:border-ambar"
+            className="btn-tactil border border-dashed border-tinta-suave/50 bg-transparent p-4 text-left hover:border-ambar"
           >
             <p className="font-display text-2xl font-bold text-tinta-suave">123</p>
             <p className="mt-1 text-sm font-semibold">Otra cantidad</p>
-            <p className="text-xs text-tinta-suave">elige empaque y número</p>
+            <p className="text-xs text-tinta-suave">abre el teclado y elige empaque</p>
           </button>
         </div>
 
@@ -177,8 +204,8 @@ function VendedorPOS() {
           </p>
           {carrito.length === 0 ? (
             <p className="px-4 py-5 text-sm text-tinta-suave">
-              Sin líneas todavía. Toca un empaque para agregarlo; mantén pulsado
-              (o clic derecho) para indicar cantidad.
+              Sin líneas todavía. Toca un empaque para agregar uno; mantén el
+              dedo sobre el botón para indicar la cantidad.
             </p>
           ) : (
             <ul>
@@ -254,8 +281,23 @@ function VendedorPOS() {
         {/* Teclado numérico propio: teclas grandes tipo cajero */}
         {keypadPara && (
           <div className="fixed inset-0 z-20 flex items-end justify-center bg-tinta/60">
-            <div className="w-full max-w-md rounded-t-xl border-t border-borde bg-superficie p-5">
-              <p className="eyebrow">Cantidad de {EMPAQUES[keypadPara].nombre}</p>
+            <div className="w-full max-w-md rounded-t-xl border-t border-borde bg-superficie p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
+              <p className="eyebrow">Cantidad de</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {ORDEN_POS.map((k) => (
+                  <button
+                    key={k}
+                    onClick={() => setKeypadPara(k)}
+                    className={`btn-tactil px-3 py-2 text-sm ${
+                      k === keypadPara
+                        ? "bg-tinta text-white"
+                        : "border border-borde bg-papel text-tinta-suave"
+                    }`}
+                  >
+                    {NOMBRE_CORTO[k]}
+                  </button>
+                ))}
+              </div>
               <p className="my-3 rounded-md bg-papel py-3 text-center font-display text-4xl font-extrabold tabular-nums">
                 {keypadValor || "0"}
               </p>

@@ -44,7 +44,7 @@ export default function Home() {
           <div className="mt-8 flex flex-wrap items-center gap-4">
             <Link
               href="/login"
-              className="btn-tactil bg-verde px-8 py-3.5 text-lg text-white hover:bg-verde-oscuro"
+              className="btn-tactil w-full bg-verde px-8 py-3.5 text-center text-lg text-white hover:bg-verde-oscuro sm:w-auto"
             >
               Iniciar sesión
             </Link>
