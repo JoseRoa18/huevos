@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
-import { esFetchNativo, obtenerFetchConfiable, fetchPorXhr } from "@/lib/supabase/client";
+import { esFetchNativo, fetchPorXhr } from "@/lib/supabase/client";
 
 /**
  * Página de diagnóstico de conectividad. Se abre en cualquier dispositivo
@@ -80,15 +80,15 @@ export default function Diagnostico() {
           },
         ],
         [
-          "4. Proxy con fetch limpio (como el login blindado)",
+          "4. Transporte definitivo: /api/sb sin headers (la vía del login)",
           async () => {
-            const hacerFetch = obtenerFetchConfiable();
-            const r = await hacerFetch("/sb/auth/v1/token?grant_type=password", {
+            const r = await fetch("/api/sb/auth/v1/token?grant_type=password", {
               method: "POST",
-              headers: { apikey: ANON, "Content-Type": "application/json" },
               body: JSON.stringify({ email: "diagnostico@x.com", password: "x" }),
             });
-            return `HTTP ${r.status} — el fetch rescatado funciona`;
+            // HTTP 400 = la petición llegó a Supabase con credenciales de
+            // prueba falsas: el transporte funciona de punta a punta.
+            return `HTTP ${r.status} — el transporte sin headers funciona: el login entra por aquí`;
           },
         ],
         [
@@ -99,14 +99,13 @@ export default function Diagnostico() {
           },
         ],
         [
-          "6. Canal XHR (respaldo del login)",
+          "6. Canal XHR de respaldo (también sin headers)",
           async () => {
-            const r = await fetchPorXhr("/sb/auth/v1/token?grant_type=password", {
+            const r = await fetchPorXhr("/api/sb/auth/v1/token?grant_type=password", {
               method: "POST",
-              headers: { apikey: ANON, "Content-Type": "application/json" },
               body: JSON.stringify({ email: "diagnostico@x.com", password: "x" }),
             });
-            return `HTTP ${r.status} — el canal XHR funciona: el login usará esta vía`;
+            return `HTTP ${r.status} — el respaldo XHR también funciona`;
           },
         ],
       ];

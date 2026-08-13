@@ -2,12 +2,16 @@ import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
- * Algunas apps instaladas en teléfonos (ahorradores de datos, VPN, adware)
- * reemplazan window.fetch por una versión propia que corrompe los headers.
- * Si detectamos un fetch manipulado, rescatamos el nativo desde un iframe
- * limpio del mismo origen.
+ * Transporte inmune a interceptores.
+ *
+ * En algunos dispositivos hay software (bloqueadores, antivirus, "protectores
+ * de privacidad") que corrompe cualquier header del navegador cuyo valor
+ * parezca un token: el fetch falla con "String contains non ISO-8859-1 code
+ * point" aunque el código sea correcto. La defensa: el navegador envía las
+ * peticiones a nuestro propio endpoint /api/sb SIN NINGÚN header; las
+ * credenciales viajan en la query string (base64url, que ese software no
+ * toca) y el servidor reconstruye los headers reales hacia Supabase.
  */
-let fetchConfiable: typeof fetch | null = null;
 
 export function esFetchNativo(fn: unknown): boolean {
   try {
@@ -17,61 +21,16 @@ export function esFetchNativo(fn: unknown): boolean {
   }
 }
 
-export function obtenerFetchConfiable(): typeof fetch {
-  if (typeof window === "undefined") return fetch;
-  if (fetchConfiable) return fetchConfiable;
-
-  if (esFetchNativo(window.fetch)) {
-    fetchConfiable = window.fetch.bind(window);
-    return fetchConfiable;
-  }
-
-  try {
-    const marco = document.createElement("iframe");
-    marco.setAttribute("aria-hidden", "true");
-    marco.style.display = "none";
-    document.documentElement.appendChild(marco);
-    const ventana = marco.contentWindow as (Window & typeof globalThis) | null;
-    if (ventana && esFetchNativo(ventana.fetch)) {
-      // El iframe queda montado a propósito: su realm debe seguir vivo.
-      fetchConfiable = ventana.fetch.bind(ventana);
-      return fetchConfiable;
-    }
-    marco.remove();
-  } catch {
-    // Sin acceso al iframe: seguimos con el fetch disponible.
-  }
-
-  fetchConfiable = window.fetch.bind(window);
-  return fetchConfiable;
+function b64url(v: string): string {
+  return btoa(v).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-/**
- * Réplica mínima de fetch sobre XMLHttpRequest. Se usa cuando el fetch del
- * navegador fue envuelto por software externo (bloqueadores, antivirus) que
- * corrompe los headers; el canal XHR no pasa por esos envoltorios.
- */
+/** Réplica mínima de fetch sobre XMLHttpRequest, sin headers personalizados. */
 export function fetchPorXhr(url: string, init?: RequestInit): Promise<Response> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open((init?.method ?? "GET").toUpperCase(), url, true);
     xhr.responseType = "arraybuffer";
-    const hs = init?.headers;
-    if (hs) {
-      const entradas: [string, string][] =
-        hs instanceof Headers
-          ? Array.from(hs.entries())
-          : Array.isArray(hs)
-            ? (hs as [string, string][])
-            : (Object.entries(hs) as [string, string][]);
-      for (const [k, v] of entradas) {
-        try {
-          xhr.setRequestHeader(k, String(v));
-        } catch {
-          // Un header inválido no debe tumbar toda la petición.
-        }
-      }
-    }
     xhr.onload = () => {
       const cabeceras = new Headers();
       for (const linea of xhr.getAllResponseHeaders().trim().split(/\r?\n/)) {
@@ -100,7 +59,7 @@ export function fetchPorXhr(url: string, init?: RequestInit): Promise<Response> 
 function esErrorDeHeadersCorruptos(e: unknown): boolean {
   return (
     e instanceof TypeError &&
-    /ISO-8859-1|Failed to read the 'headers'/i.test(e.message)
+    /ISO-8859-1|Failed to read the 'headers'|Invalid value|Invalid header/i.test(e.message)
   );
 }
 
@@ -109,41 +68,69 @@ function esErrorDeHeadersCorruptos(e: unknown): boolean {
  * Devuelve null si las variables de entorno no están configuradas todavía
  * (modo demostración): la app sigue funcionando con datos locales.
  *
- * Las peticiones HTTP (auth, datos, storage) se enrutan por el propio dominio
- * (/sb -> Supabase, ver next.config.ts) para que bloqueadores de contenido y
- * antivirus no las corten. Si aun así el fetch del navegador está saboteado
- * (envoltorios que corrompen headers), se reintenta por XMLHttpRequest.
- * El websocket de realtime va directo a Supabase: no usa fetch y el proxy
- * de Vercel no reenvía websockets.
+ * Todas las peticiones HTTP van por /api/sb (mismo dominio, cero headers).
+ * El websocket de realtime va directo a Supabase: no usa fetch y no lleva
+ * headers del navegador.
  */
 export function getSupabaseBrowser(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
 
-  const fetchViaProxy: typeof fetch = async (entrada, init) => {
-    const hacerFetch = obtenerFetchConfiable();
+  const fetchBlindado: typeof fetch = async (entrada, init) => {
     const destino =
       typeof entrada === "string"
         ? entrada
         : entrada instanceof URL
           ? entrada.href
           : entrada.url;
-    const objetivo = destino.startsWith(url) ? destino.replace(url, "/sb") : destino;
+
+    // Peticiones ajenas a Supabase: sin tocar.
+    if (!destino.startsWith(url)) return fetch(entrada, init);
+
+    // Reunir los headers que supabase-js quería mandar.
+    const originales = new Headers(
+      init?.headers ??
+        (typeof entrada !== "string" && !(entrada instanceof URL)
+          ? entrada.headers
+          : undefined),
+    );
+
+    const u = new URL(destino.replace(url, "/api/sb"), window.location.origin);
+    const auth = originales.get("authorization");
+    if (auth?.toLowerCase().startsWith("bearer ")) {
+      const token = auth.slice(7).trim();
+      if (token && token !== key) u.searchParams.set("t", b64url(token));
+    }
+    const ct = originales.get("content-type");
+    if (ct) u.searchParams.set("ct", ct);
+    const prefer = originales.get("prefer");
+    if (prefer) u.searchParams.set("prefer", prefer);
+    const xu = originales.get("x-upsert");
+    if (xu) u.searchParams.set("xu", xu);
+
+    const metodo =
+      init?.method ??
+      (typeof entrada !== "string" && !(entrada instanceof URL) ? entrada.method : "GET");
+    const cuerpo =
+      init?.body ??
+      (typeof entrada !== "string" && !(entrada instanceof URL)
+        ? await entrada.clone().arrayBuffer().then((b) => (b.byteLength ? b : null))
+        : null);
+
+    const limpio: RequestInit = { method: metodo, body: cuerpo ?? undefined };
+
     try {
-      if (typeof entrada !== "string" && !(entrada instanceof URL) && objetivo !== destino) {
-        return await hacerFetch(new Request(objetivo, entrada), init);
-      }
-      return await hacerFetch(objetivo === destino ? entrada : objetivo, init);
+      return await fetch(u.href, limpio);
     } catch (e) {
-      if (esErrorDeHeadersCorruptos(e)) {
-        return fetchPorXhr(objetivo, init);
+      if (esErrorDeHeadersCorruptos(e) || e instanceof TypeError) {
+        return fetchPorXhr(u.href, limpio);
       }
       throw e;
     }
   };
 
-  return createBrowserClient(url, key, { global: { fetch: fetchViaProxy } });
+  return createBrowserClient(url, key, { global: { fetch: fetchBlindado } });
 }
 
 export const supabaseConfigurado = Boolean(
