@@ -84,10 +84,20 @@ function PortalCliente() {
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [facturaAbierta, setFacturaAbierta] = useState<Factura | null>(null);
   const [categoria, setCategoria] = useState<CategoriaCliente>("MAYORISTA");
-  const [perfil, setPerfil] = useState<{ nombre: string; correo: string }>({
+  const [perfil, setPerfil] = useState({
     nombre: "Cliente (demo)",
     correo: "demo@ejemplo.com",
+    telefono: "",
+    direccion: "",
   });
+  const [formPerfil, setFormPerfil] = useState({
+    nombre: "",
+    correo: "",
+    telefono: "",
+    direccion: "",
+    passwordNueva: "",
+  });
+  const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [faltaMigracion, setFaltaMigracion] = useState(false);
 
   const huevos = useMemo(() => totalHuevos(pedidoActual), [pedidoActual]);
@@ -104,13 +114,17 @@ function PortalCliente() {
       if (!session) return;
 
       const [{ data: prof }, { data: cust }] = await Promise.all([
-        supabase.from("profiles").select("full_name").eq("id", session.user.id).single(),
+        supabase.from("profiles").select("*").eq("id", session.user.id).single(),
         supabase.from("customers").select("categoria").eq("profile_id", session.user.id).maybeSingle(),
       ]);
-      setPerfil({
+      const datos = {
         nombre: prof?.full_name || session.user.email || "Cliente",
         correo: session.user.email ?? "",
-      });
+        telefono: prof?.telefono ?? "",
+        direccion: prof?.direccion ?? "",
+      };
+      setPerfil(datos);
+      setFormPerfil({ ...datos, passwordNueva: "" });
       if (cust?.categoria) setCategoria(cust.categoria as CategoriaCliente);
 
       const { data: peds, error } = await supabase
@@ -194,6 +208,72 @@ function PortalCliente() {
     }
     setPedidoActual([]);
     setEnviando(false);
+  }
+
+  async function guardarPerfil(e: React.FormEvent) {
+    e.preventDefault();
+    const supabase = getSupabaseBrowser();
+    if (!supabase) {
+      setMensaje({ tipo: "ok", texto: "Perfil actualizado (modo demostración)." });
+      return;
+    }
+    setGuardandoPerfil(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        full_name: formPerfil.nombre.trim(),
+        telefono: formPerfil.telefono.trim() || null,
+        direccion: formPerfil.direccion.trim() || null,
+      })
+      .eq("id", session.user.id);
+
+    if (error) {
+      setMensaje({
+        tipo: "error",
+        texto:
+          error.code === "42703" || error.code === "42501"
+            ? "La edición de perfil aún no está activa en el servidor (falta la migración 00005)."
+            : `No se pudo guardar: ${error.message}`,
+      });
+      setGuardandoPerfil(false);
+      return;
+    }
+
+    const avisos: string[] = ["Datos guardados."];
+
+    const nuevoCorreo = formPerfil.correo.trim().toLowerCase();
+    if (nuevoCorreo && nuevoCorreo !== perfil.correo.toLowerCase()) {
+      const { error: errCorreo } = await supabase.auth.updateUser({ email: nuevoCorreo });
+      avisos.push(
+        errCorreo
+          ? `El correo no se pudo cambiar: ${errCorreo.message}`
+          : "Te enviamos un enlace de confirmación al correo nuevo: el cambio se aplica al confirmarlo.",
+      );
+    }
+
+    if (formPerfil.passwordNueva.trim()) {
+      const { error: errPass } = await supabase.auth.updateUser({
+        password: formPerfil.passwordNueva.trim(),
+      });
+      avisos.push(
+        errPass
+          ? `La contraseña no se pudo cambiar: ${errPass.message}`
+          : "Contraseña actualizada.",
+      );
+    }
+
+    setPerfil((prev) => ({
+      ...prev,
+      nombre: formPerfil.nombre.trim(),
+      telefono: formPerfil.telefono.trim(),
+      direccion: formPerfil.direccion.trim(),
+    }));
+    setFormPerfil((prev) => ({ ...prev, passwordNueva: "" }));
+    setMensaje({ tipo: "ok", texto: avisos.join(" ") });
+    setGuardandoPerfil(false);
   }
 
   async function cerrarSesion() {
@@ -509,24 +589,92 @@ function PortalCliente() {
         {pestana === "perfil" && (
           <>
             <h1 className="font-display text-2xl font-bold">Mi perfil</h1>
-            <section className="mt-4 overflow-hidden rounded-lg border border-borde bg-superficie">
-              <div className="border-b border-borde px-4 py-3.5">
-                <p className="eyebrow">Nombre</p>
-                <p className="mt-0.5 font-semibold">{perfil.nombre}</p>
-              </div>
-              <div className="border-b border-borde px-4 py-3.5">
-                <p className="eyebrow">Correo</p>
-                <p className="mt-0.5 font-semibold">{perfil.correo}</p>
-              </div>
-              <div className="px-4 py-3.5">
-                <p className="eyebrow">Lista de precios</p>
-                <p className="mt-0.5 font-semibold capitalize">{categoria.toLowerCase()}</p>
-              </div>
-            </section>
+            <p className="mt-1 text-sm text-tinta-suave">
+              Lista de precios asignada:{" "}
+              <span className="font-semibold capitalize">{categoria.toLowerCase()}</span>
+            </p>
+
+            <form
+              onSubmit={guardarPerfil}
+              className="mt-4 space-y-4 rounded-lg border border-borde bg-superficie p-5"
+            >
+              <label className="block">
+                <span className="eyebrow">Nombre o negocio</span>
+                <input
+                  type="text"
+                  required
+                  value={formPerfil.nombre}
+                  onChange={(e) => setFormPerfil({ ...formPerfil, nombre: e.target.value })}
+                  className="mt-1.5 w-full rounded-md border border-borde p-3.5 text-lg"
+                  placeholder="Panadería El Trigo"
+                />
+              </label>
+
+              <label className="block">
+                <span className="eyebrow">Teléfono de contacto</span>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={formPerfil.telefono}
+                  onChange={(e) => setFormPerfil({ ...formPerfil, telefono: e.target.value })}
+                  className="mt-1.5 w-full rounded-md border border-borde p-3.5 text-lg"
+                  placeholder="0414-1234567"
+                />
+              </label>
+
+              <label className="block">
+                <span className="eyebrow">Dirección de entrega</span>
+                <textarea
+                  rows={2}
+                  value={formPerfil.direccion}
+                  onChange={(e) => setFormPerfil({ ...formPerfil, direccion: e.target.value })}
+                  className="mt-1.5 w-full rounded-md border border-borde p-3 text-base"
+                  placeholder="Calle, local, referencia…"
+                />
+              </label>
+
+              <label className="block">
+                <span className="eyebrow">Correo</span>
+                <input
+                  type="email"
+                  required
+                  autoCapitalize="none"
+                  value={formPerfil.correo}
+                  onChange={(e) => setFormPerfil({ ...formPerfil, correo: e.target.value })}
+                  className="mt-1.5 w-full rounded-md border border-borde p-3.5 text-lg"
+                />
+                <span className="mt-1 block text-xs text-tinta-suave">
+                  Si lo cambias, te llega un enlace de confirmación al correo nuevo.
+                </span>
+              </label>
+
+              <label className="block">
+                <span className="eyebrow">Nueva contraseña (opcional)</span>
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={6}
+                  value={formPerfil.passwordNueva}
+                  onChange={(e) =>
+                    setFormPerfil({ ...formPerfil, passwordNueva: e.target.value })
+                  }
+                  className="mt-1.5 w-full rounded-md border border-borde p-3.5 text-lg"
+                  placeholder="Déjala vacía para no cambiarla"
+                />
+              </label>
+
+              <button
+                type="submit"
+                disabled={guardandoPerfil}
+                className="btn-tactil w-full bg-verde py-3.5 text-lg text-white hover:bg-verde-oscuro disabled:opacity-50"
+              >
+                {guardandoPerfil ? "Guardando…" : "Guardar cambios"}
+              </button>
+            </form>
 
             <button
               onClick={cerrarSesion}
-              className="btn-tactil mt-5 w-full border border-rojo/40 bg-superficie py-3.5 text-rojo hover:border-rojo"
+              className="btn-tactil mt-4 w-full border border-rojo/40 bg-superficie py-3.5 text-rojo hover:border-rojo"
             >
               Cerrar sesión
             </button>
