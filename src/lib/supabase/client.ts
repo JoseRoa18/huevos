@@ -72,9 +72,14 @@ function esErrorDeHeadersCorruptos(e: unknown): boolean {
  * El websocket de realtime va directo a Supabase: no usa fetch y no lleva
  * headers del navegador.
  */
+/** Quita BOM y cualquier carácter invisible de un valor de configuración. */
+function sanear(v: string | undefined): string {
+  return (v ?? "").replace(/[^\x21-\x7e]/g, "");
+}
+
 export function getSupabaseBrowser(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = sanear(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const key = sanear(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
   if (!url || !key) return null;
 
   const fetchBlindado: typeof fetch = async (entrada, init) => {

@@ -21,7 +21,9 @@ async function manejar(
   req: NextRequest,
   { params }: { params: Promise<{ ruta: string[] }> },
 ) {
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  // Sanear: una variable de entorno guardada con BOM u otro carácter
+  // invisible rompe los headers HTTP (ByteString solo admite ASCII/Latin-1).
+  const anon = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").replace(/[^\x21-\x7e]/g, "");
   if (!anon) {
     return Response.json({ error: "Supabase no configurado" }, { status: 500 });
   }

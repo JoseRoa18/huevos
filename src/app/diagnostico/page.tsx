@@ -16,8 +16,8 @@ type Resultado = {
   estado: "probando" | "ok" | "fallo";
 };
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const SUPABASE_URL = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").replace(/[^\x21-\x7e]/g, "");
+const ANON = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "").replace(/[^\x21-\x7e]/g, "");
 
 async function probar(
   nombre: string,
