@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatoDesglose } from "@/lib/units";
 import { getSupabaseBrowser, supabaseConfigurado } from "@/lib/supabase/client";
 import RequireRole from "@/components/RequireRole";
 import AppShell from "@/components/AppShell";
@@ -9,6 +10,38 @@ import { IcoAlmacen, IcoCamion } from "@/components/Icons";
 
 type Almacen = { nombre: string; tipo: string; huevos: number };
 type VentaReciente = { hora: string; vendedor: string; huevos: number; monto: number };
+
+type PedidoAdmin = {
+  id: string;
+  total_huevos: number;
+  total_monto: number;
+  estado: string;
+  created_at: string;
+  cliente: { full_name: string } | null;
+};
+
+type FacturaAdmin = {
+  id: string;
+  numero: number;
+  monto: number;
+  pagada: boolean;
+  created_at: string;
+  pedido: { cliente: { full_name: string } | null } | null;
+};
+
+const SIGUIENTE_ESTADO: Record<string, { estado: string; accion: string }> = {
+  PENDIENTE: { estado: "CONFIRMADO", accion: "Confirmar" },
+  CONFIRMADO: { estado: "EN_DESPACHO", accion: "Despachar" },
+  EN_DESPACHO: { estado: "ENTREGADO", accion: "Marcar entregado" },
+};
+
+const CLASE_ESTADO: Record<string, string> = {
+  PENDIENTE: "bg-panal text-ambar-oscuro",
+  CONFIRMADO: "bg-tinta/10 text-tinta",
+  EN_DESPACHO: "bg-tinta text-white",
+  ENTREGADO: "bg-verde/10 text-verde",
+  CANCELADO: "bg-rojo/10 text-rojo",
+};
 
 // Datos de demostración mientras Supabase no está conectado
 const DEMO_ALMACENES: Almacen[] = [
@@ -26,37 +59,94 @@ const DEMO_VENTAS: VentaReciente[] = [
 function AdminDashboard() {
   const [almacenes, setAlmacenes] = useState<Almacen[]>(DEMO_ALMACENES);
   const [ventas, setVentas] = useState<VentaReciente[]>(DEMO_VENTAS);
+  const [pedidos, setPedidos] = useState<PedidoAdmin[]>([]);
+  const [facturas, setFacturas] = useState<FacturaAdmin[]>([]);
   const [enVivo, setEnVivo] = useState(false);
+  const [gestionando, setGestionando] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = getSupabaseBrowser();
     if (!supabase) return;
 
     async function cargar() {
-      const [{ data: stock }, { data: ultimas }] = await Promise.all([
-        supabase!.from("stock_por_almacen").select("nombre, tipo, huevos"),
-        supabase!
-          .from("ventas_recientes")
-          .select("hora, vendedor, huevos, monto")
-          .limit(10),
-      ]);
+      const [{ data: stock }, { data: ultimas }, { data: peds }, { data: facts }] =
+        await Promise.all([
+          supabase!.from("stock_por_almacen").select("nombre, tipo, huevos"),
+          supabase!
+            .from("ventas_recientes")
+            .select("hora, vendedor, huevos, monto")
+            .limit(10),
+          supabase!
+            .from("pedidos")
+            .select("id, total_huevos, total_monto, estado, created_at, cliente:profiles(full_name)")
+            .order("created_at", { ascending: false })
+            .limit(20),
+          supabase!
+            .from("facturas")
+            .select("id, numero, monto, pagada, created_at, pedido:pedidos(cliente:profiles(full_name))")
+            .order("created_at", { ascending: false })
+            .limit(20),
+        ]);
       if (stock) setAlmacenes(stock as Almacen[]);
       if (ultimas) setVentas(ultimas as VentaReciente[]);
+      if (peds) setPedidos(peds as unknown as PedidoAdmin[]);
+      if (facts) setFacturas(facts as unknown as FacturaAdmin[]);
       setEnVivo(true);
     }
     cargar();
 
-    // Sincronización en tiempo real: cualquier venta refresca el panel
+    // Sincronización en tiempo real: ventas, stock y pedidos refrescan el panel
     const canal = supabase
       .channel("dashboard")
       .on("postgres_changes", { event: "*", schema: "public", table: "sales" }, cargar)
       .on("postgres_changes", { event: "*", schema: "public", table: "stock" }, cargar)
+      .on("postgres_changes", { event: "*", schema: "public", table: "pedidos" }, cargar)
       .subscribe();
 
     return () => {
       supabase.removeChannel(canal);
     };
   }, []);
+
+  async function avanzarPedido(p: PedidoAdmin, nuevoEstado: string) {
+    const supabase = getSupabaseBrowser();
+    if (!supabase) return;
+    setGestionando(p.id);
+    const { error } = await supabase
+      .from("pedidos")
+      .update({ estado: nuevoEstado })
+      .eq("id", p.id);
+    if (!error) {
+      setPedidos((prev) =>
+        prev.map((x) => (x.id === p.id ? { ...x, estado: nuevoEstado } : x)),
+      );
+      if (nuevoEstado === "ENTREGADO") {
+        const { data: facts } = await supabase
+          .from("facturas")
+          .select("id, numero, monto, pagada, created_at, pedido:pedidos(cliente:profiles(full_name))")
+          .order("created_at", { ascending: false })
+          .limit(20);
+        if (facts) setFacturas(facts as unknown as FacturaAdmin[]);
+      }
+    }
+    setGestionando(null);
+  }
+
+  async function marcarPagada(f: FacturaAdmin) {
+    const supabase = getSupabaseBrowser();
+    if (!supabase) return;
+    setGestionando(f.id);
+    const { error } = await supabase
+      .from("facturas")
+      .update({ pagada: true })
+      .eq("id", f.id);
+    if (!error) {
+      setFacturas((prev) =>
+        prev.map((x) => (x.id === f.id ? { ...x, pagada: true } : x)),
+      );
+    }
+    setGestionando(null);
+  }
 
   const totalHuevos = almacenes.reduce((a, x) => a + x.huevos, 0);
   const ventasHoy = ventas.reduce((a, v) => a + v.monto, 0);
@@ -110,6 +200,133 @@ function AdminDashboard() {
             </p>
           </div>
         </section>
+
+        {/* Pedidos de clientes: llegan en vivo y se avanzan de estado aquí */}
+        <section className="mt-8">
+          <p className="eyebrow">Pedidos de clientes</p>
+          {pedidos.length === 0 ? (
+            <p className="mt-3 rounded-lg border border-borde bg-superficie p-5 text-sm text-tinta-suave">
+              Sin pedidos por ahora. Aparecerán aquí en tiempo real cuando un
+              cliente ordene desde su portal.
+            </p>
+          ) : (
+            <div className="mt-3 overflow-x-auto rounded-lg border border-borde bg-superficie">
+              <table className="w-full min-w-[640px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-borde text-[11px] uppercase tracking-wider text-tinta-suave">
+                    <th className="px-4 py-3 font-bold">Fecha</th>
+                    <th className="px-4 py-3 font-bold">Cliente</th>
+                    <th className="px-4 py-3 font-bold">Pedido</th>
+                    <th className="px-4 py-3 text-right font-bold">Monto</th>
+                    <th className="px-4 py-3 font-bold">Estado</th>
+                    <th className="px-4 py-3 text-right font-bold">Acción</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pedidos.map((p) => {
+                    const paso = SIGUIENTE_ESTADO[p.estado];
+                    return (
+                      <tr key={p.id} className="border-b border-borde last:border-0">
+                        <td className="px-4 py-3 tabular-nums text-tinta-suave">
+                          {new Date(p.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })}
+                        </td>
+                        <td className="px-4 py-3 font-semibold">
+                          {p.cliente?.full_name ?? "Cliente"}
+                        </td>
+                        <td className="px-4 py-3 text-tinta-suave">
+                          {formatoDesglose(p.total_huevos)}
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                          ${Number(p.total_monto).toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`rounded px-2 py-0.5 text-xs font-bold uppercase ${CLASE_ESTADO[p.estado] ?? ""}`}>
+                            {p.estado.replaceAll("_", " ").toLowerCase()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex justify-end gap-2">
+                            {paso && (
+                              <button
+                                onClick={() => avanzarPedido(p, paso.estado)}
+                                disabled={gestionando === p.id}
+                                className="btn-tactil bg-verde px-3 py-1.5 text-xs text-white hover:bg-verde-oscuro disabled:opacity-50"
+                              >
+                                {paso.accion}
+                              </button>
+                            )}
+                            {(p.estado === "PENDIENTE" || p.estado === "CONFIRMADO") && (
+                              <button
+                                onClick={() => avanzarPedido(p, "CANCELADO")}
+                                disabled={gestionando === p.id}
+                                className="btn-tactil border border-rojo/40 px-3 py-1.5 text-xs text-rojo hover:border-rojo disabled:opacity-50"
+                              >
+                                Cancelar
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        {/* Facturas: se emiten al entregar; aquí se marcan pagadas */}
+        {facturas.length > 0 && (
+          <section className="mt-8">
+            <p className="eyebrow">Facturas</p>
+            <div className="mt-3 overflow-x-auto rounded-lg border border-borde bg-superficie">
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-borde text-[11px] uppercase tracking-wider text-tinta-suave">
+                    <th className="px-4 py-3 font-bold">Nº</th>
+                    <th className="px-4 py-3 font-bold">Cliente</th>
+                    <th className="px-4 py-3 font-bold">Fecha</th>
+                    <th className="px-4 py-3 text-right font-bold">Monto</th>
+                    <th className="px-4 py-3 text-right font-bold">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {facturas.map((f) => (
+                    <tr key={f.id} className="border-b border-borde last:border-0">
+                      <td className="px-4 py-3 font-display font-bold tabular-nums">
+                        F-{String(f.numero).padStart(6, "0")}
+                      </td>
+                      <td className="px-4 py-3 font-semibold">
+                        {f.pedido?.cliente?.full_name ?? "Cliente"}
+                      </td>
+                      <td className="px-4 py-3 tabular-nums text-tinta-suave">
+                        {new Date(f.created_at).toLocaleDateString("es", { day: "2-digit", month: "short" })}
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                        ${Number(f.monto).toFixed(2)}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {f.pagada ? (
+                          <span className="rounded bg-verde/10 px-2 py-0.5 text-xs font-bold uppercase text-verde">
+                            Pagada
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => marcarPagada(f)}
+                            disabled={gestionando === f.id}
+                            className="btn-tactil bg-tinta px-3 py-1.5 text-xs text-white disabled:opacity-50"
+                          >
+                            Marcar pagada
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
 
         {/* Inventario por punto */}
         <section className="mt-8">
