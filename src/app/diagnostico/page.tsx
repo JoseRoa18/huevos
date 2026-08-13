@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AppShell from "@/components/AppShell";
+import { esFetchNativo, obtenerFetchConfiable } from "@/lib/supabase/client";
 
 /**
  * Página de diagnóstico de conectividad. Se abre en cualquier dispositivo
@@ -36,11 +37,14 @@ export default function Diagnostico() {
   const [info, setInfo] = useState<string[]>([]);
 
   useEffect(() => {
+    const fetchNativo = esFetchNativo(window.fetch);
     setInfo([
       `Dominio: ${window.location.origin}`,
       `Navegador: ${navigator.userAgent}`,
       `Conexión reportada: ${navigator.onLine ? "en línea" : "sin conexión"}`,
       `Supabase configurado: ${SUPABASE_URL ? "sí" : "no"}`,
+      `fetch nativo del navegador: ${fetchNativo ? "sí" : "NO — hay software interceptando las peticiones"}`,
+      `firma de fetch: ${String(window.fetch).slice(0, 100)}`,
     ]);
 
     (async () => {
@@ -73,6 +77,18 @@ export default function Diagnostico() {
               headers: { apikey: ANON },
             });
             return `HTTP ${r.status} — directa también funciona`;
+          },
+        ],
+        [
+          "4. Proxy con fetch limpio (como el login blindado)",
+          async () => {
+            const hacerFetch = obtenerFetchConfiable();
+            const r = await hacerFetch("/sb/auth/v1/token?grant_type=password", {
+              method: "POST",
+              headers: { apikey: ANON, "Content-Type": "application/json" },
+              body: JSON.stringify({ email: "diagnostico@x.com", password: "x" }),
+            });
+            return `HTTP ${r.status} — el fetch rescatado funciona`;
           },
         ],
       ];
